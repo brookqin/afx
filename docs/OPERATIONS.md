@@ -91,6 +91,14 @@ Worker 配置了每小时 Cron Trigger(`0 * * * *`),执行:
   - 公开下载 410:文件已过期/消费/删除,检查 `expires_at` 与状态。
   - Inbox 上传 409 `inbox_upload_in_progress`:已有上传进行中,等待租约过期或完成。
 
+## CLI 发布
+
+- 推送符合 `v<major>.<minor>.<patch>`（可带预发布后缀）的 Tag 会触发 `.github/workflows/release-cli.yml`。
+- Workflow 先运行 CLI 测试，再交叉编译 Linux、macOS、Windows 的 amd64/arm64 产物。
+- Release 压缩包内包含 `afx`、`LICENSE`、`README.md`，并同时发布 `checksums.txt`。
+- 版本、Commit 与构建时间通过 Go linker flags 注入，可用 `afx version` 或 `afx --json version` 核对。
+- Release 发布使用仓库 `GITHUB_TOKEN` 和最小的 `contents: write` 权限，不需要额外 Token。
+
 ## 数据保留
 
 - D1 元数据与审计默认永久保留(软删除)。

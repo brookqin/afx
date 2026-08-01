@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent File Exchange"
+  short_description: "Share and receive temporary files with AFX"
+  default_prompt: "Use $agent-file-exchange to share a local file with a temporary link."

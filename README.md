@@ -4,7 +4,7 @@
 
 ![Agent File Exchange social preview](docs/assets/social-preview.png)
 
-Agent File Exchange (AFX) is a temporary file exchange service for automated agents. It runs on Cloudflare Workers, stores metadata in D1, stores file bodies in R2, and includes an English Go CLI.
+Agent File Exchange (AFX) is a temporary file exchange service for automated agents. It runs on Cloudflare Workers, stores metadata in D1, stores file bodies in R2, and includes a Go CLI.
 
 ## Features
 
@@ -29,12 +29,39 @@ public recipient ── capability URL ─────────> download or 
 
 The Worker never proxies upload bodies. A signed URL can only write to a staging key; completion verifies size and metadata before copying to the final key, so an old upload URL cannot overwrite a published file.
 
+## Agent workflows
+
+### Share a file
+
+```mermaid
+flowchart LR
+  S1["Agent selects an authorized local file"] --> S2["Run afx upload --json"]
+  S2 --> S3["Worker creates a short-lived upload session"]
+  S3 --> S4["CLI uploads directly to an R2 staging object"]
+  S4 --> S5["Worker verifies and publishes the final object"]
+  S5 --> S6["CLI returns data.url"]
+  S6 --> S7["Agent gives the temporary link to the recipient"]
+  S7 --> S8["Recipient downloads the file"]
+```
+
+### Receive a file
+
+```mermaid
+flowchart LR
+  R1["Agent runs afx inbox create --json"] --> R2["CLI returns data.id and data.upload_url"]
+  R2 --> R3["Agent gives the upload link to the sender"]
+  R3 --> R4["Sender uploads directly to R2 through the public page"]
+  R4 --> R5["Agent runs afx inbox wait --download --json"]
+  R5 --> R6["CLI polls the inbox and downloads the completed file"]
+  R6 --> R7["Agent verifies data.path and returns the local file"]
+```
+
 ## Repository layout
 
 ```text
 worker/   Cloudflare Worker (TypeScript, Hono, D1, R2)
 cli/      afx CLI (Go, Cobra; English interface)
-skill/    Agent Skill instructions
+skills/   Installable Agent Skills and bundled scripts
 docs/     API, security, operations, and social assets
 design/   Implementation plan and design decisions
 ```
@@ -75,6 +102,18 @@ This repository has not been released or deployed yet, so `worker/migrations/000
 
 ### 2. Build and use the CLI
 
+Install the latest macOS or Linux release with checksum verification:
+
+```bash
+installer="$(mktemp)"
+curl -fsSL https://raw.githubusercontent.com/brookqin/afx/main/skills/agent-file-exchange/scripts/install-cli.sh -o "$installer"
+sh "$installer"
+rm "$installer"
+afx version
+```
+
+Alternatively, build from source:
+
 ```bash
 make build
 export AFX_ENDPOINT=https://files.example.com
@@ -87,6 +126,8 @@ export AFX_ROOT_API_KEY=afx_root_...
 ```
 
 Run `./cli/afx --help` for the full English command reference.
+
+Pushing a semantic version tag such as `v1.2.3` runs the CLI release workflow. It tests and publishes Linux, macOS, and Windows archives for amd64 and arm64 together with `checksums.txt`.
 
 ### 3. Develop and test
 
@@ -123,7 +164,7 @@ See [Security](docs/SECURITY.md) before production use.
 - [API reference](docs/API.md)
 - [Operations guide](docs/OPERATIONS.md)
 - [Security model](docs/SECURITY.md)
-- [Agent Skill](skill/SKILL.md)
+- [Agent Skill](skills/agent-file-exchange/SKILL.md)
 - [Implementation plan](design/agent-file-exchange-implementation-plan.md)
 
 ## License

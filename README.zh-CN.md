@@ -4,7 +4,7 @@
 
 ![Agent File Exchange Social Preview](docs/assets/social-preview.png)
 
-Agent File Exchange（AFX）是一个面向自动化 Agent 的临时文件交换服务。它运行在 Cloudflare Workers 上，使用 D1 保存元数据、R2 保存文件本体，并提供英文 Go CLI。
+Agent File Exchange（AFX）是一个面向自动化 Agent 的临时文件交换服务。它运行在 Cloudflare Workers 上，使用 D1 保存元数据、R2 保存文件本体，并提供 Go CLI。
 
 ## 功能
 
@@ -29,12 +29,39 @@ afx CLI / Agent ── 元数据 API ──> Cloudflare Worker ──> D1
 
 Worker 不代理上传文件正文。签名 URL 只能写暂存 Key；完成接口校验大小和元数据后才复制到最终 Key，因此旧上传 URL 无法覆盖已经发布的文件。
 
+## Agent 使用流程
+
+### 分享文件
+
+```mermaid
+flowchart LR
+  S1["Agent 选择已获授权的本地文件"] --> S2["执行 afx upload --json"]
+  S2 --> S3["Worker 创建短期上传会话"]
+  S3 --> S4["CLI 将文件直传到 R2 暂存对象"]
+  S4 --> S5["Worker 校验并发布最终对象"]
+  S5 --> S6["CLI 返回 data.url"]
+  S6 --> S7["Agent 将临时链接交给接收者"]
+  S7 --> S8["接收者下载文件"]
+```
+
+### 接收文件
+
+```mermaid
+flowchart LR
+  R1["Agent 执行 afx inbox create --json"] --> R2["CLI 返回 data.id 和 data.upload_url"]
+  R2 --> R3["Agent 将上传链接交给发送者"]
+  R3 --> R4["发送者通过公开页面将文件直传 R2"]
+  R4 --> R5["Agent 执行 afx inbox wait --download --json"]
+  R5 --> R6["CLI 轮询 Inbox 并下载已完成的文件"]
+  R6 --> R7["Agent 校验 data.path 并返回本地文件"]
+```
+
 ## 目录结构
 
 ```text
 worker/   Cloudflare Worker（TypeScript、Hono、D1、R2）
 cli/      afx CLI（Go、Cobra，界面保持英文）
-skill/    Agent Skill 说明
+skills/   可安装的 Agent Skill 与配套脚本
 docs/     API、安全、运维文档与图片资源
 design/   实现计划与设计决策
 ```
@@ -75,6 +102,18 @@ npx wrangler deploy
 
 ### 2. 构建和使用 CLI
 
+macOS 或 Linux 可自动安装最新 Release，并校验 SHA-256：
+
+```bash
+installer="$(mktemp)"
+curl -fsSL https://raw.githubusercontent.com/brookqin/afx/main/skills/agent-file-exchange/scripts/install-cli.sh -o "$installer"
+sh "$installer"
+rm "$installer"
+afx version
+```
+
+也可以从源码构建：
+
 ```bash
 make build
 export AFX_ENDPOINT=https://files.example.com
@@ -87,6 +126,8 @@ export AFX_ROOT_API_KEY=afx_root_...
 ```
 
 运行 `./cli/afx --help` 查看完整英文命令说明。
+
+推送 `v1.2.3` 这类语义化版本 Tag 后，CLI Release workflow 会自动测试并发布 Linux、macOS、Windows 的 amd64/arm64 压缩包及 `checksums.txt`。
 
 ### 3. 本地开发与测试
 
@@ -123,7 +164,7 @@ Worker 公开网页支持英文（`en`）和简体中文（`zh-CN`），语言�
 - [API 参考](docs/API.md)
 - [安全说明](docs/SECURITY.md)
 - [运维手册](docs/OPERATIONS.md)
-- [Agent Skill](skill/SKILL.md)
+- [Agent Skill](skills/agent-file-exchange/SKILL.md)
 - [实现计划](design/agent-file-exchange-implementation-plan.md)
 
 ## 开源协议

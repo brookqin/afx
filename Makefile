@@ -1,8 +1,13 @@
 .PHONY: build test test-worker test-cli typecheck migrate deploy worker-dev
 
+CLI_VERSION ?= dev
+CLI_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || printf unknown)
+CLI_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+CLI_LDFLAGS = -X afx/internal/buildinfo.Version=$(CLI_VERSION) -X afx/internal/buildinfo.Commit=$(CLI_COMMIT) -X afx/internal/buildinfo.Date=$(CLI_BUILD_DATE)
+
 # CLI 构建
 build:
-	cd cli && go build -o afx .
+	cd cli && go build -trimpath -ldflags "$(CLI_LDFLAGS)" -o afx .
 
 # 全部测试
 test: test-worker test-cli
