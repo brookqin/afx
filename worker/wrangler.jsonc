@@ -1,0 +1,39 @@
+// Cloudflare Worker 配置。部署前请根据实际账号填写 database_id / bucket 名称。
+// Secrets 通过 `wrangler secret put` 配置:ROOT_API_KEY_HASH / ROOT_API_KEY_PEPPER /
+// API_KEY_PEPPER / TOKEN_HASH_PEPPER / IP_HASH_PEPPER /
+// R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY。
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agent-file-exchange",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-06",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "agent-file-exchange",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "agent-file-exchange"
+    }
+  ],
+
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+
+  "vars": {
+    "PUBLIC_BASE_URL": "http://localhost:8787",
+    "DEFAULT_MAX_FILE_SIZE_BYTES": "104857600",
+    "DIRECT_UPLOAD_EXPIRES_SECONDS": "900",
+    "R2_ACCOUNT_ID": "REPLACE_WITH_CLOUDFLARE_ACCOUNT_ID",
+    "R2_BUCKET_NAME": "agent-file-exchange"
+  }
+}

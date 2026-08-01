@@ -1,0 +1,21 @@
+# Node
+node_modules/
+dist/
+.wrangler/
+dev.vars
+*.tsbuildinfo
+
+# Go
+cli/afx
+cli/bin/
+*.test
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Local secrets / config
+.afx.toml
+config.toml
+*.local.toml
