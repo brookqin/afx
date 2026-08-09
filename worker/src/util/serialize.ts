@@ -13,6 +13,7 @@ export function fileToApi(f: FileRow): Record<string, unknown> {
     id: f.id,
     source: f.source,
     filename: f.original_name,
+    description: f.description,
     content_type: f.content_type,
     size_bytes: f.size_bytes,
     sha256: f.sha256,

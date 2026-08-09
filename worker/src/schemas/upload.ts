@@ -3,12 +3,15 @@ import { z } from 'zod';
 const filename = z.string().trim().min(1).max(255);
 const contentType = z.string().trim().max(200).regex(/^[\x20-\x7e]*$/).nullable().optional();
 const sizeBytes = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+export const MAX_FILE_DESCRIPTION_LENGTH = 2000;
+const description = z.string().trim().max(MAX_FILE_DESCRIPTION_LENGTH).nullable().optional();
 
 export const initiateFileUploadSchema = z
   .object({
     filename,
     size_bytes: sizeBytes,
     content_type: contentType,
+    description,
     expires_in: z.number().int().positive().optional(),
     max_downloads: z.number().int().positive().nullable().optional(),
     burn_after_read: z.boolean().optional().default(false),
@@ -23,6 +26,7 @@ export const initiateInboxUploadSchema = z
     filename,
     size_bytes: sizeBytes,
     content_type: contentType,
+    description,
   })
   .strict();
 

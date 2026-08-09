@@ -83,6 +83,7 @@ Worker 配置了每小时 Cron Trigger(`0 * * * *`),执行:
 ## 监控与排障
 
 - 健康检查:`GET /healthz`
+- CLI 配置与普通 Key 校验:`afx status --json`（认证探针为 `GET /api/status`，不要求业务 Scope）
 - 审计:`GET /api/root/audit`(结果含 `failed`/`denied` 事件)
 - 全局统计:`GET /api/root/stats`
 - 日志:Worker 日志中 `request_id` 与审计 `request_id` 对应,便于排查。

@@ -98,7 +98,7 @@ npx wrangler d1 migrations apply agent-file-exchange --remote
 npx wrangler deploy
 ```
 
-本项目尚未发布部署，因此 `worker/migrations/0001_initial.sql` 是新数据库的唯一结构来源，不保留增量 `ALTER TABLE` migration。
+按顺序应用 `worker/migrations/` 中的全部 Migration；Wrangler 会记录已完成项并只执行待应用文件。
 
 ### 2. 构建和使用 CLI
 
@@ -120,12 +120,16 @@ export AFX_ENDPOINT=https://files.example.com
 export AFX_API_KEY=afx_...
 export AFX_ROOT_API_KEY=afx_root_...
 
-./cli/afx upload report.pdf --expires 24h --json
+./cli/afx status --json
+
+./cli/afx upload report.pdf --description "季度报告" --expires 24h --json
 ./cli/afx inbox create --expires 1h --title "Upload logs" --json
 ./cli/afx inbox wait <inbox-id> --timeout 1h --download --output . --json
 ```
 
 运行 `./cli/afx --help` 查看完整英文命令说明。
+
+`afx status --json` 不显示任何密钥，只报告解析后的 Endpoint 与配置来源。未配置普通 Key 时检查服务连通性；配置 Key 后通过不依赖业务 Scope 的认证状态接口校验 Key 是否有效。
 
 推送 `v1.2.3` 这类语义化版本 Tag 后，CLI Release workflow 会自动测试并发布 Linux、macOS、Windows 的 amd64/arm64 压缩包及 `checksums.txt`。
 

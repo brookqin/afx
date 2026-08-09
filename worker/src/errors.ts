@@ -38,6 +38,9 @@ export const invalidToken = (message = 'Invalid token.', details: ErrorDetails =
 export const internalError = (message = 'Internal server error.', logMessage?: string) =>
   new ApiError('internal_error', 500, message, {}, logMessage);
 
+export const directUploadNotConfigured = (message = 'Direct upload is not configured.', logMessage?: string) =>
+  new ApiError('direct_upload_not_configured', 500, message, {}, logMessage);
+
 /* ---- 认证 ---- */
 export const invalidApiKey = (message = 'Invalid API key.', details: ErrorDetails = {}) =>
   new ApiError('invalid_api_key', 401, message, details);

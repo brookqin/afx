@@ -70,6 +70,7 @@ export interface CreateInboxResult {
 export interface InitiateInboxUploadInput {
   token: string;
   filename: string;
+  description?: string | null;
   contentType?: string | null;
   sizeBytes: number;
   requestId: string;
@@ -256,6 +257,7 @@ export class InboxService {
         source: 'inbox_upload',
         objectKey: key,
         originalName: cleanName,
+        description: input.description?.trim() || null,
         contentType,
         sizeBytes: input.sizeBytes,
         sha256: null,

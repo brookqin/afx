@@ -39,7 +39,7 @@ func TestUploadFile(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatal(err)
 			}
-			if body["filename"] != "test.txt" || body["size_bytes"] != float64(5) || body["expires_in"] != float64(3600) {
+			if body["filename"] != "test.txt" || body["size_bytes"] != float64(5) || body["expires_in"] != float64(3600) || body["description"] != "test report" {
 				t.Errorf("init body = %#v", body)
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -72,7 +72,7 @@ func TestUploadFile(t *testing.T) {
 	}
 
 	client := New(srv.URL, "test-key")
-	q := url.Values{"expires_in": {"3600"}}
+	q := url.Values{"expires_in": {"3600"}, "description": {"test report"}}
 	data, err := client.UploadFile(context.Background(), tmp, q)
 	if err != nil {
 		t.Fatalf("upload: %v", err)
@@ -115,6 +115,25 @@ func TestDoJSONNotFound(t *testing.T) {
 	apiErr, ok := err.(*APIError)
 	if !ok || apiErr.Info.Code != "file_not_found" {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestHealth(t *testing.T) {
+	srv := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/healthz" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "" {
+			t.Fatal("health request must not include authorization")
+		}
+		fmt.Fprint(w, `{"ok":true,"status":"ok","time":"2026-08-09T00:00:00Z"}`)
+	})
+	data, err := New(srv.URL, "must-not-leak").Health(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data["status"] != "ok" {
+		t.Fatalf("data = %#v", data)
 	}
 }
 
@@ -195,9 +214,10 @@ func TestDirectUploadFileStreaming(t *testing.T) {
 func TestParseContentDisposition(t *testing.T) {
 	cases := map[string]string{
 		`attachment; filename="a.txt"; filename*=UTF-8''a.txt`: "a.txt",
-		`attachment; filename*=UTF-8''%E6%8A%A5%E5%91%8A.pdf`:  "报告.pdf",
-		`attachment; filename="fallback.bin"`:                  "fallback.bin",
-		"":                                                     "",
+		`attachment; filename="____.pdf"; filename*=UTF-8''%E6%B5%8B%E8%AF%95%E6%96%87%E6%A1%A3.pdf`: "测试文档.pdf",
+		`attachment; filename*=UTF-8''report%2Bfinal.pdf; filename="fallback.pdf"`:                                                                                 "report+final.pdf",
+		`attachment; filename="fallback.bin"`: "fallback.bin",
+		"":                                    "",
 	}
 	for cd, want := range cases {
 		if got := parseContentDisposition(cd); got != want {

@@ -51,6 +51,36 @@ func New(baseURL, apiKey string) *Client {
 	}
 }
 
+// Health checks the unauthenticated service health endpoint.
+func (c *Client) Health(ctx context.Context) (map[string]any, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/healthz", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", c.UserAgent)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, &TimeoutError{Err: err}
+		}
+		return nil, &NetworkError{Err: err}
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return nil, &NetworkError{Err: err}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, &ServerError{Status: resp.StatusCode, Body: truncate(string(raw), 500)}
+	}
+	var data map[string]any
+	if err := json.Unmarshal(raw, &data); err != nil || data["ok"] != true {
+		return nil, fmt.Errorf("invalid health response")
+	}
+	return data, nil
+}
+
 // DoJSON 发起 JSON 请求并解析统一响应。返回 data 字段(可能为 null)。
 func (c *Client) DoJSON(ctx context.Context, method, path string, query url.Values, body any) (any, error) {
 	var bodyReader io.Reader
@@ -123,6 +153,9 @@ func (c *Client) UploadFile(ctx context.Context, filePath string, query url.Valu
 	}
 	if value := query.Get("burn_after_read"); value == "true" || value == "1" {
 		body["burn_after_read"] = true
+	}
+	if value := query.Get("description"); value != "" {
+		body["description"] = value
 	}
 
 	initData, err := c.DoJSON(ctx, "POST", "/api/files", nil, body)
@@ -282,22 +315,26 @@ func truncate(s string, n int) string {
 }
 
 func parseContentDisposition(cd string) string {
+	var fallback string
 	for _, part := range strings.Split(cd, ";") {
 		part = strings.TrimSpace(part)
-		if strings.HasPrefix(part, "filename*=UTF-8''") {
-			v := strings.TrimPrefix(part, "filename*=UTF-8''")
-			if dec, err := url.QueryUnescape(v); err == nil {
+		key, value, ok := strings.Cut(part, "=")
+		if !ok {
+			continue
+		}
+		value = strings.Trim(value, `"`)
+		if strings.EqualFold(key, "filename*") && len(value) >= len("UTF-8''") && strings.EqualFold(value[:len("UTF-8''")], "UTF-8''") {
+			v := value[len("UTF-8''"):]
+			if dec, err := url.PathUnescape(v); err == nil {
 				return dec
 			}
 			return v
 		}
-		if strings.HasPrefix(part, "filename=") {
-			v := strings.TrimPrefix(part, "filename=")
-			v = strings.Trim(v, `"`)
-			return v
+		if strings.EqualFold(key, "filename") {
+			fallback = value
 		}
 	}
-	return ""
+	return fallback
 }
 
 // NetworkError 网络错误(退出码 7)。

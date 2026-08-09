@@ -70,6 +70,7 @@ export async function publicUploadInitiateHandler(c: Context): Promise<Response>
   const result = await s.inboxes.initiateUpload({
     token,
     filename: parsed.data.filename,
+    description: parsed.data.description,
     sizeBytes: parsed.data.size_bytes,
     contentType: parsed.data.content_type,
     requestId,

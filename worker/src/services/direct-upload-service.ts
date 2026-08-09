@@ -2,7 +2,7 @@
 
 import { AwsClient } from 'aws4fetch';
 import type { Env } from '../env';
-import { internalError } from '../errors';
+import { directUploadNotConfigured, internalError } from '../errors';
 
 const DEFAULT_EXPIRES_SECONDS = 15 * 60;
 const MIN_EXPIRES_SECONDS = 60;
@@ -41,7 +41,7 @@ function signer(env: Env): AwsClient {
 
 function assertConfigured(env: Env): void {
   if (!env.R2_ACCOUNT_ID || !env.R2_BUCKET_NAME || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) {
-    throw internalError('Direct upload is not configured.', 'Missing R2 S3 signing credentials.');
+    throw directUploadNotConfigured(undefined, 'Missing R2 S3 signing credentials.');
   }
 }
 

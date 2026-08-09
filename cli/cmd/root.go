@@ -54,6 +54,7 @@ func init() {
 	rootCmd.AddCommand(inboxCmd)
 	rootCmd.AddCommand(adminCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(statusCmd)
 }
 
 // resolveConfig 组装配置与客户端。root 为 true 时使用 Root Key。

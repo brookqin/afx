@@ -19,3 +19,5 @@ cli/bin/
 .afx.toml
 config.toml
 *.local.toml
+worker/wrangler.production.local.jsonc
+worker/r2-cors.production.local.json
