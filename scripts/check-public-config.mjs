@@ -34,7 +34,7 @@ for (const rule of corsExample.rules ?? []) {
 
 const scan = spawnSync('git', ['grep', '-n', '-I', '-E',
   String.raw`/Users/[^/[:space:]]+|[[:alnum:]._%+-]+@(gmail|qq|outlook|hotmail|icloud)\.[[:alpha:]]+`,
-  '--', '.'], { encoding: 'utf8' });
+  '--', '.', ':(exclude)scripts/check-public-config.mjs'], { encoding: 'utf8' });
 
 if (scan.status !== 0 && scan.status !== 1) {
   throw new Error(`identity scan failed: ${scan.stderr}`);

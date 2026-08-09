@@ -21,7 +21,41 @@ fi
 
 The installer downloads only from `brookqin/afx` GitHub Releases, verifies the published SHA-256 checksum, and never invokes `sudo`. On Windows, download the matching `afx_<version>_windows_<arch>.zip` and `checksums.txt` from the same GitHub Release, verify the checksum, and use `afx.exe`.
 
-Require `AFX_ENDPOINT` and `AFX_API_KEY` for file operations. Prefer environment variables or `~/.config/afx/config.toml`; never place an API key in a command argument, log, source file, or user-visible response.
+## Configure authentication
+
+Normal file operations require a resolved endpoint and a tenant API key. The CLI resolves settings in this order: command flags, environment variables, `~/.config/afx/config.toml`, then the default endpoint `http://localhost:8787`. API keys have no default.
+
+Set both of these environment variables for normal operation:
+
+```sh
+export AFX_ENDPOINT="https://files.example.com"
+export AFX_API_KEY="afx_replace_with_tenant_key"
+```
+
+For a persistent local setup, create `~/.config/afx/config.toml` with owner-only permissions:
+
+```toml
+endpoint = "https://files.example.com"
+api_key = "afx_replace_with_tenant_key"
+```
+
+The containing directory should be mode `0700` and the file mode `0600`. Do not commit or upload this file. The equivalent flags are `--endpoint` and `--api-key`, but do not pass secrets as command arguments because they can enter shell history or process listings.
+
+### Root key boundary
+
+`AFX_ROOT_API_KEY` is the global administrator credential used only by `afx admin ...`. It can create, disable, enable, and revoke tenant API keys and access global administration endpoints. It is not an R2 token and is not needed for upload, inbox, file-status, or deletion workflows.
+
+Keep the Root key in a password manager or OS credential store. Do not put `root_api_key` in the normal Skill config, source control, chat, logs, command arguments, or user-visible output. When administration is explicitly requested, load it ephemerally as `AFX_ROOT_API_KEY`, perform the minimum operation, then unset it. Although the CLI also accepts `root_api_key` in the TOML file and `--root-key`, this Skill must not use those persistence or command-line forms.
+
+Use the Root key to create a separate, least-privilege tenant key for this Skill. For the complete share-and-receive workflow:
+
+```sh
+afx admin keys create codex-skill \
+  --scopes files:upload,files:list,files:read,files:delete,inboxes:create,inboxes:list,inboxes:read,inboxes:delete \
+  --json
+```
+
+The returned tenant key is shown once. Store only that tenant key as `AFX_API_KEY`; keep the Root key outside routine operations. Parse all command output through `--json` and never echo either credential.
 
 ## Share a file
 
