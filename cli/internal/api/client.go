@@ -315,22 +315,26 @@ func truncate(s string, n int) string {
 }
 
 func parseContentDisposition(cd string) string {
+	var fallback string
 	for _, part := range strings.Split(cd, ";") {
 		part = strings.TrimSpace(part)
-		if strings.HasPrefix(part, "filename*=UTF-8''") {
-			v := strings.TrimPrefix(part, "filename*=UTF-8''")
-			if dec, err := url.QueryUnescape(v); err == nil {
+		key, value, ok := strings.Cut(part, "=")
+		if !ok {
+			continue
+		}
+		value = strings.Trim(value, `"`)
+		if strings.EqualFold(key, "filename*") && len(value) >= len("UTF-8''") && strings.EqualFold(value[:len("UTF-8''")], "UTF-8''") {
+			v := value[len("UTF-8''"):]
+			if dec, err := url.PathUnescape(v); err == nil {
 				return dec
 			}
 			return v
 		}
-		if strings.HasPrefix(part, "filename=") {
-			v := strings.TrimPrefix(part, "filename=")
-			v = strings.Trim(v, `"`)
-			return v
+		if strings.EqualFold(key, "filename") {
+			fallback = value
 		}
 	}
-	return ""
+	return fallback
 }
 
 // NetworkError 网络错误(退出码 7)。

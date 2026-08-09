@@ -214,9 +214,10 @@ func TestDirectUploadFileStreaming(t *testing.T) {
 func TestParseContentDisposition(t *testing.T) {
 	cases := map[string]string{
 		`attachment; filename="a.txt"; filename*=UTF-8''a.txt`: "a.txt",
-		`attachment; filename*=UTF-8''%E6%8A%A5%E5%91%8A.pdf`:  "报告.pdf",
-		`attachment; filename="fallback.bin"`:                  "fallback.bin",
-		"":                                                     "",
+		`attachment; filename="_________7_.pdf"; filename*=UTF-8''%E5%9B%BD%E5%AE%B6%E5%8C%BB%E7%96%97%E4%BF%9D%E9%9A%9C%E5%B1%80%E4%BB%A4%E7%AC%AC7%E5%8F%B7.pdf`: "国家医疗保障局令第7号.pdf",
+		`attachment; filename*=UTF-8''report%2Bfinal.pdf; filename="fallback.pdf"`:                                                                                 "report+final.pdf",
+		`attachment; filename="fallback.bin"`: "fallback.bin",
+		"":                                    "",
 	}
 	for cd, want := range cases {
 		if got := parseContentDisposition(cd); got != want {
