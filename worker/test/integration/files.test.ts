@@ -118,13 +118,46 @@ describe('认证与租户隔离', () => {
 });
 
 describe('上传与下载', () => {
-  it('正常上传后可通过公开链接下载', async () => {
+  it('公开链接返回 AI 友好的详情页，下载按钮端点返回文件', async () => {
     const a = await createKey('upload-1');
-    const up = await uploadFile(a.apiKey, 'hello world', 'hello.txt');
+    const description = '季度报告\n<script>alert(1)</script>';
+    const up = await uploadFile(a.apiKey, 'hello world', 'hello.txt', '', description);
     expect(up.status).toBe(200);
     expect(up.url).toContain('/d/');
 
-    const dl = await SELF.fetch(up.url);
+    const page = await SELF.fetch(up.url);
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain('hello.txt');
+    expect(html).toContain('季度报告');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).toContain('\\u003cscript>alert(1)\\u003c/script>');
+    expect(html).toContain('application/ld+json');
+    expect(html).toContain('data-local-date');
+    expect(html).toContain("timeZoneName: 'longOffset'");
+    expect(html).toContain(`${tokenFromUrl(up.url)}/file`);
+    expect(page.headers.get('x-robots-tag')).toContain('noindex');
+
+    const metadata = await SELF.fetch(up.url, { headers: { accept: 'application/json' } });
+    const metadataBody = (await metadata.json()) as any;
+    expect(metadata.status).toBe(200);
+    expect(metadataBody.data).toMatchObject({
+      filename: 'hello.txt',
+      size_bytes: 11,
+      description,
+      content_type: 'application/octet-stream',
+      download_url: `${up.url}/file`,
+    });
+    expect(metadataBody.data.uploaded_at).toMatch(/^\d{4}-/);
+
+    const ownerDetail = await SELF.fetch(`http://localhost/api/files/${up.id}`, {
+      headers: { authorization: `Bearer ${a.apiKey}` },
+    });
+    const ownerDetailBody = (await ownerDetail.json()) as any;
+    expect(ownerDetailBody.data.file.description).toBe(description);
+
+    const dl = await SELF.fetch(`${up.url}/file`);
     expect(dl.status).toBe(200);
     expect(new TextDecoder().decode(await dl.arrayBuffer())).toBe('hello world');
     expect(dl.headers.get('content-disposition')).toContain('attachment');
@@ -136,7 +169,7 @@ describe('上传与下载', () => {
     const a = await createKey('upload-2');
     const up = await uploadFile(a.apiKey, '', 'empty.bin');
     expect(up.status).toBe(200);
-    const dl = await SELF.fetch(up.url);
+    const dl = await SELF.fetch(`${up.url}/file`);
     expect(dl.status).toBe(200);
     expect((await dl.arrayBuffer()).byteLength).toBe(0);
   });
@@ -146,6 +179,21 @@ describe('上传与下载', () => {
     const up = await uploadFile(a.apiKey, 'x'.repeat(11), 'big.txt');
     expect(up.status).toBe(413);
     expect(up.body.error.code).toBe('file_too_large');
+  });
+
+  it('文件描述最多允许 2000 个字符', async () => {
+    const a = await createKey('upload-description-limit');
+    const res = await SELF.fetch('http://localhost/api/files', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${a.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        filename: 'a.txt',
+        size_bytes: 1,
+        content_type: 'text/plain',
+        description: 'x'.repeat(2001),
+      }),
+    });
+    expect(await respStatus(res)).toBe(400);
   });
 
   it('不存在的下载 Token 返回 404', async () => {
@@ -167,10 +215,10 @@ describe('上传与下载', () => {
     });
     expect(await respStatus(priv)).toBe(200);
     // 公开下载仍可用(计数未被私有下载消耗)
-    const dl = await SELF.fetch(up.url);
+    const dl = await SELF.fetch(`${up.url}/file`);
     expect(await respStatus(dl)).toBe(200);
     // 公开额度耗尽
-    const dl2 = await SELF.fetch(up.url);
+    const dl2 = await SELF.fetch(`${up.url}/file`);
     expect(await respStatus(dl2)).toBe(410);
   });
 });
@@ -180,30 +228,32 @@ describe('下载次数限制', () => {
     const a = await createKey('limit-1');
     const up = await uploadFile(a.apiKey, 'once', 'once.txt', '?max_downloads=1');
     expect(await respStatus(await SELF.fetch(up.url))).toBe(200);
+    expect(await respStatus(await SELF.fetch(`${up.url}/file`))).toBe(200);
     expect(await respStatus(await SELF.fetch(up.url))).toBe(410);
   });
 
   it('max_downloads=N 允许 N 次', async () => {
     const a = await createKey('limit-2');
     const up = await uploadFile(a.apiKey, 'n', 'n.txt', '?max_downloads=3');
-    expect(await respStatus(await SELF.fetch(up.url))).toBe(200);
-    expect(await respStatus(await SELF.fetch(up.url))).toBe(200);
-    expect(await respStatus(await SELF.fetch(up.url))).toBe(200);
-    expect(await respStatus(await SELF.fetch(up.url))).toBe(410);
+    expect(await respStatus(await SELF.fetch(`${up.url}/file`))).toBe(200);
+    expect(await respStatus(await SELF.fetch(`${up.url}/file`))).toBe(200);
+    expect(await respStatus(await SELF.fetch(`${up.url}/file`))).toBe(200);
+    expect(await respStatus(await SELF.fetch(`${up.url}/file`))).toBe(410);
   });
 
   it('不限制次数时可持续下载', async () => {
     const a = await createKey('limit-3');
     const up = await uploadFile(a.apiKey, 'unlimited', 'u.txt');
     for (let i = 0; i < 5; i++) {
-      expect(await respStatus(await SELF.fetch(up.url))).toBe(200);
+      expect(await respStatus(await SELF.fetch(`${up.url}/file`))).toBe(200);
     }
   });
 
   it('并发争抢最后一次额度只有一个成功', async () => {
     const a = await createKey('limit-4');
     const up = await uploadFile(a.apiKey, 'race', 'race.txt', '?max_downloads=1');
-    const statuses = await parallelStatus([up.url, up.url, up.url]);
+    const downloadUrl = `${up.url}/file`;
+    const statuses = await parallelStatus([downloadUrl, downloadUrl, downloadUrl]);
     const ok = statuses.filter((s) => s === 200).length;
     expect(ok).toBe(1);
   });
@@ -214,7 +264,8 @@ describe('阅后即焚', () => {
     const a = await createKey('burn-1');
     const up = await uploadFile(a.apiKey, 'secret', 's.txt', '?burn_after_read=true');
     expect(await respStatus(await SELF.fetch(up.url))).toBe(200);
-    const second = await SELF.fetch(up.url, { headers: { accept: 'application/json' } });
+    expect(await respStatus(await SELF.fetch(`${up.url}/file`))).toBe(200);
+    const second = await SELF.fetch(`${up.url}/file`, { headers: { accept: 'application/json' } });
     const secondBody = (await second.json()) as any;
     expect(second.status).toBe(410);
     expect(secondBody.error.code).toBe('file_consumed');
@@ -229,7 +280,8 @@ describe('阅后即焚', () => {
   it('并发访问阅后即焚文件最多一个成功', async () => {
     const a = await createKey('burn-3');
     const up = await uploadFile(a.apiKey, 'burn-race', 'b.txt', '?burn_after_read=true');
-    const statuses = await parallelStatus([up.url, up.url, up.url]);
+    const downloadUrl = `${up.url}/file`;
+    const statuses = await parallelStatus([downloadUrl, downloadUrl, downloadUrl]);
     const ok = statuses.filter((s) => s === 200).length;
     expect(ok).toBe(1);
   });

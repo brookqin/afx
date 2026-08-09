@@ -12,6 +12,35 @@ import * as fileRepo from '../repositories/file-repository';
 import { getRequestId } from '../middleware/request-id';
 import { ipHashOf } from '../middleware/ip-hash';
 import { resolveLocale } from '../i18n';
+import { DownloadPage } from '../pages/download-page';
+import { toIso } from '../util/time';
+
+export async function publicDownloadPageHandler(c: Context): Promise<Response> {
+  const s = services(c);
+  const locale = resolveLocale(c);
+  const token = c.req.param('token') ?? '';
+  const requestId = getRequestId(c);
+  const res = await s.files.publicFileInfo(token);
+  if ('error' in res) {
+    if (wantsJson(c)) return errorJson(res.error, requestId);
+    applyPublicPageHeaders(c, locale);
+    return c.html(<ErrorPage error={res.error} locale={locale} />, res.error.status as 400 | 404 | 409 | 410 | 500);
+  }
+
+  const base = s.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  const data = {
+    filename: res.file.original_name,
+    size_bytes: res.file.size_bytes,
+    description: res.file.description,
+    content_type: res.file.content_type ?? 'application/octet-stream',
+    uploaded_at: toIso(res.file.ready_at ?? res.file.created_at),
+    expires_at: toIso(res.file.expires_at),
+    download_url: `${base}/d/${token}/file`,
+  };
+  applyPublicPageHeaders(c, locale);
+  if (wantsJson(c)) return Response.json({ ok: true, data, request_id: requestId });
+  return c.html(<DownloadPage file={res.file} token={token} locale={locale} publicBaseUrl={base} />);
+}
 
 export async function publicDownloadHandler(c: Context): Promise<Response> {
   const s = services(c);
@@ -82,4 +111,11 @@ function applyPublicErrorHeaders(c: Context, locale: 'en' | 'zh-CN'): void {
   c.header('Vary', 'Accept-Language');
   c.header('Referrer-Policy', 'no-referrer');
   c.header('X-Content-Type-Options', 'nosniff');
+}
+
+function applyPublicPageHeaders(c: Context, locale: 'en' | 'zh-CN'): void {
+  applyPublicErrorHeaders(c, locale);
+  c.header('Vary', 'Accept, Accept-Language');
+  c.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; frame-ancestors 'none'");
+  c.header('X-Robots-Tag', 'noindex, nofollow, noarchive');
 }

@@ -56,6 +56,7 @@ export interface InitiateUploadContext {
   maxDownloads?: number | null;
   burnAfterRead: boolean;
   filename: string;
+  description?: string | null;
   contentType?: string | null;
   sizeBytes: number;
   requestId: string;
@@ -120,6 +121,7 @@ export class FileService {
       source: 'agent_upload',
       objectKey: key,
       originalName: cleanName,
+      description: ctx.description?.trim() || null,
       contentType,
       sizeBytes: ctx.sizeBytes,
       sha256: null,
@@ -288,6 +290,18 @@ export class FileService {
       file: claimed,
       burn: claimed.burn_after_read === 1,
     };
+  }
+
+  /** 读取公开分享页元数据，不领取下载次数，也不触发阅后即焚。 */
+  async publicFileInfo(rawToken: string): Promise<{ file: FileRow } | { error: ApiError }> {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(rawToken)) return { error: invalidToken() };
+    const hash = await tokenHash(this.env.TOKEN_HASH_PEPPER, rawToken);
+    const now = nowMs();
+    const file = await fileRepo.getFileByTokenHash(this.env.DB, hash);
+    const error = diagnosePublicFileError(file, now);
+    if (!file || file.status !== 'ready' || isExpired(file.expires_at, now)) return { error };
+    if (file.max_downloads != null && file.download_count >= file.max_downloads) return { error };
+    return { file };
   }
 
   /** 读取 R2 对象。返回 null 表示对象缺失。 */

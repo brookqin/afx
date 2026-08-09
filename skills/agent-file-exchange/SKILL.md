@@ -30,10 +30,10 @@ Require `AFX_ENDPOINT` and `AFX_API_KEY` for file operations. Prefer environment
 3. Run:
 
 ```sh
-"$AFX_BIN" upload "<path>" --expires 24h --json
+"$AFX_BIN" upload "<path>" --description "<description>" --expires 24h --json
 ```
 
-Add `--downloads <count>` only when requested. Add `--burn` only with explicit approval; do not combine it with `--downloads` greater than 1. Treat burn-after-read as first-download-attempt semantics, including interrupted transfers.
+Omit `--description` when no description is requested; descriptions are limited to 2,000 characters. Add `--downloads <count>` only when requested. Add `--burn` only with explicit approval; do not combine it with `--downloads` greater than 1. Treat burn-after-read as first-download-attempt semantics, including interrupted transfers.
 
 Require `ok: true`, then return `data.url`. Retain `data.id` for later status checks or deletion. Never invent or reconstruct a URL.
 

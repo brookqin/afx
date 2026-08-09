@@ -31,11 +31,11 @@ async function createInbox(apiKey: string, overrides: Record<string, unknown> = 
   return { status: res.status, ...json };
 }
 
-async function uploadTo(uploadUrl: string, content: string, filename: string) {
+async function uploadTo(uploadUrl: string, content: string, filename: string, description?: string) {
   const initiated = await SELF.fetch(`${uploadUrl}/initiate`, {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json' },
-    body: JSON.stringify({ filename, size_bytes: new TextEncoder().encode(content).byteLength, content_type: 'application/octet-stream' }),
+    body: JSON.stringify({ filename, size_bytes: new TextEncoder().encode(content).byteLength, content_type: 'application/octet-stream', description }),
   });
   const initBody = (await initiated.json()) as any;
   if (!initBody.ok) return new Response(JSON.stringify(initBody), { status: initiated.status, headers: { 'content-type': 'application/json' } });
@@ -67,6 +67,14 @@ describe('接收链接', () => {
     expect(html).toContain('请上传诊断日志');
     expect(html).toContain('fileInput.files && fileInput.files[0]');
     expect(html).toContain('.bar > div');
+    expect(html).toContain('name="description"');
+    expect(html).toContain('maxlength="2000"');
+    expect(html).toContain('>选择文件</label>');
+    expect(html).toContain('尚未选择文件');
+    expect(html).toContain('data-local-date');
+    expect(html).toContain("timeZoneName: 'longOffset'");
+    expect(html).toContain('上传服务尚未配置，请联系管理员。');
+    expect(html).not.toContain('initBody.error && initBody.error.message');
     expect(html).not.toContain(a.apiKey);
     expect(html).not.toContain('objects/');
     expect(page.headers.get('referrer-policy')).toBe('no-referrer');
@@ -84,6 +92,8 @@ describe('接收链接', () => {
     expect(english.headers.get('content-language')).toBe('en');
     expect(englishHTML).toContain('<html lang="en">');
     expect(englishHTML).toContain('Maximum file size');
+    expect(englishHTML).toContain('>Choose file</label>');
+    expect(englishHTML).toContain('No file selected');
     expect(englishHTML).toContain('Creating a secure upload session');
 
     const chinese = await SELF.fetch(inbox.data.upload_url, {
@@ -157,7 +167,7 @@ describe('接收链接', () => {
   it('Agent 可查询并下载收到的文件', async () => {
     const a = await createKey('inbox-8');
     const inbox = await createInbox(a.apiKey);
-    await respStatus(await uploadTo(inbox.data.upload_url, 'received-content', 'payload.zip'));
+    await respStatus(await uploadTo(inbox.data.upload_url, 'received-content', 'payload.zip', '来自外部系统的诊断包'));
 
     // 详情含文件摘要
     const detail = await SELF.fetch(`http://localhost/api/inboxes/${inbox.data.id}`, {
@@ -166,6 +176,7 @@ describe('接收链接', () => {
     const detailJson = (await detail.json()) as any;
     expect(detailJson.data.status).toBe('completed');
     expect(detailJson.data.file.filename).toBe('payload.zip');
+    expect(detailJson.data.file.description).toBe('来自外部系统的诊断包');
 
     // 下载
     const dl = await SELF.fetch(`http://localhost/api/inboxes/${inbox.data.id}/file`, {

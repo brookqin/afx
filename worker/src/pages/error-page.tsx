@@ -17,8 +17,14 @@ export const ErrorPage: FC<{ error: ApiError; locale: Locale }> = ({ error, loca
   const copy = errorCopy(error, locale);
   return (
     <Layout title={copy.title} locale={locale}>
-      <h1>{copy.title}</h1>
-      <p>{copy.message}</p>
+      <header class="card-header">
+        <span class="eyebrow">{messages(locale).genericErrorTitle}</span>
+        <h1>{copy.title}</h1>
+        <p class="lead">{copy.message}</p>
+      </header>
+      <footer class="card-footer">
+        <a class="btn btn-secondary" href="/">Agent File Exchange</a>
+      </footer>
     </Layout>
   );
 };

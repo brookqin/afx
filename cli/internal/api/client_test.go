@@ -39,7 +39,7 @@ func TestUploadFile(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatal(err)
 			}
-			if body["filename"] != "test.txt" || body["size_bytes"] != float64(5) || body["expires_in"] != float64(3600) {
+			if body["filename"] != "test.txt" || body["size_bytes"] != float64(5) || body["expires_in"] != float64(3600) || body["description"] != "test report" {
 				t.Errorf("init body = %#v", body)
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -72,7 +72,7 @@ func TestUploadFile(t *testing.T) {
 	}
 
 	client := New(srv.URL, "test-key")
-	q := url.Values{"expires_in": {"3600"}}
+	q := url.Values{"expires_in": {"3600"}, "description": {"test report"}}
 	data, err := client.UploadFile(context.Background(), tmp, q)
 	if err != nil {
 		t.Fatalf("upload: %v", err)

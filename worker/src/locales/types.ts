@@ -1,11 +1,25 @@
 export interface MessageCatalog {
   homeDescription: string;
   homeAudience: string;
+  homeBadge: string;
+  homeDirectTitle: string;
+  homeDirectDescription: string;
+  homeInboxTitle: string;
+  homeInboxDescription: string;
+  homeSecurityTitle: string;
+  homeSecurityDescription: string;
+  homeGithub: string;
   uploadDefaultTitle: string;
+  uploadEyebrow: string;
   allowedExtensions: string;
   allowedTypes: string;
   maxFileSize: string;
   deadline: string;
+  languageLabel: string;
+  chooseFile: string;
+  noFileSelected: string;
+  fileDescription: string;
+  fileDescriptionHint: string;
   uploadButton: string;
   uploadClient: {
     creating: string;
@@ -21,6 +35,14 @@ export interface MessageCatalog {
   successHeading: string;
   successReceived: string;
   successClose: string;
+  downloadTitle: string;
+  downloadHeading: string;
+  downloadFilename: string;
+  downloadUploadedAt: string;
+  downloadSize: string;
+  downloadDescription: string;
+  downloadButton: string;
+  downloadNotice: string;
   genericErrorTitle: string;
   errors: Record<string, { title: string; message: string }>;
 }

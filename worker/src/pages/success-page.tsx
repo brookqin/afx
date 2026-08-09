@@ -13,9 +13,14 @@ export const SuccessPage: FC<SuccessPageProps> = ({ filename, locale }) => {
   const copy = messages(locale);
   return (
     <Layout title={copy.successTitle} locale={locale}>
-      <h1 class="ok">{copy.successHeading}</h1>
-      {filename ? <p>{copy.successReceived}: {filename}</p> : null}
-      <p>{copy.successClose}</p>
+      <header class="card-header">
+        <span class="eyebrow">{copy.successTitle}</span>
+        <h1>{copy.successHeading}</h1>
+        {filename ? <p class="lead">{copy.successReceived}: <strong>{filename}</strong></p> : null}
+      </header>
+      <footer class="card-footer">
+        <p class="notice">{copy.successClose}</p>
+      </footer>
     </Layout>
   );
 };

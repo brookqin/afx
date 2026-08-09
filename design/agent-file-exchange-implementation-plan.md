@@ -435,6 +435,7 @@ CREATE TABLE files (
 
     object_key TEXT NOT NULL UNIQUE,
     original_name TEXT NOT NULL,
+    description TEXT,
     content_type TEXT,
     size_bytes INTEGER NOT NULL,
     sha256 TEXT,
@@ -719,6 +720,7 @@ GET  /
 GET  /healthz
 
 GET  /d/:token
+GET  /d/:token/file
 GET  /u/:token
 POST /u/:token/initiate
 POST /u/:token/complete
@@ -728,7 +730,8 @@ POST /u/:token/complete
 
 - `/`：简洁说明页，可选。
 - `/healthz`：健康检查。
-- `/d/:token`：公开下载。
+- `/d/:token`：公开下载详情页；读取元数据不消耗下载次数，`Accept: application/json` 返回结构化元数据。
+- `/d/:token/file`：实际公开下载；原子领取下载额度并强制附件响应。
 - `/u/:token`：显示一次性上传页面。
 - `/u/:token/initiate`：声明文件元数据、原子领取上传租约并签发 R2 暂存 PUT URL。
 - `/u/:token/complete`：校验暂存对象并以 CopyObject 发布到最终 Key。
@@ -843,6 +846,7 @@ Content-Type: application/json
 - 文件名必须清理为 basename。
 - `size_bytes` 是声明值，完成时必须以 R2 HEAD 的对象大小复核。
 - 原始 MIME 不可信，只作为元数据与 presigned PUT 的签名 Header。
+- 可选文件描述去除首尾空白后最多 2000 字符，并作为公开下载页元数据展示。
 - 公共下载时默认使用 `application/octet-stream`。
 
 ## 15.2 直传处理流程
@@ -894,6 +898,12 @@ Worker 不读取、不代理、不缓冲文件正文。浏览器直传必须配�
 ---
 
 ## 16. 公开下载
+
+`GET /d/:token` 只读取可公开的文件元数据并呈现独立详情页，不领取下载额度。详情页提供文件名、
+上传完成时间、大小、可选描述和指向 `GET /d/:token/file` 的下载按钮。机器客户端可在详情 URL
+发送 `Accept: application/json` 获取相同元数据；HTML 同时包含语义化标记与 Schema.org JSON-LD。
+
+以下下载计数与阅后即焚规则仅由 `GET /d/:token/file` 触发。
 
 ## 16.1 下载次数定义
 
@@ -1075,7 +1085,10 @@ Content-Type: application/json
 - 必须验证 `inboxes:create` Scope。
 - 到期时间不得超过 API Key 策略。
 - `max_file_size_bytes` 不得超过 API Key 最大文件大小。
-- `title` 和 `description` 需要长度限制并在 HTML 中转义。
+- Inbox 的 `title` 和 `description` 需要长度限制并在 HTML 中转义。
+- 上传者可为文件附带最多 2000 字符的 `description`；普通 API 与公开 Inbox 上传使用同一限制。
+- 下载详情页显示文件名、上传完成时间、大小、可选描述与下载按钮，并同时提供语义化 HTML、
+  Schema.org JSON-LD 和 `Accept: application/json` 元数据表示。
 - 扩展名和 MIME 过滤只属于辅助校验，不是安全边界。
 - 上传后的文件始终强制附件下载。
 
@@ -1827,6 +1840,7 @@ AFX_ROOT_API_KEY
 
 ```bash
 afx upload report.pdf
+afx upload report.pdf --description "季度报告"
 afx upload report.pdf --expires 24h
 afx upload report.pdf --downloads 3
 afx upload report.pdf --burn
@@ -2150,6 +2164,7 @@ inbox_lease_lost
 
 quota_exceeded
 rate_limited
+direct_upload_not_configured
 internal_error
 ```
 

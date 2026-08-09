@@ -30,7 +30,7 @@
   },
 
   "vars": {
-    "PUBLIC_BASE_URL": "http://localhost:8787",
+    "PUBLIC_BASE_URL": "https://files.example.com",
     "DEFAULT_MAX_FILE_SIZE_BYTES": "104857600",
     "DIRECT_UPLOAD_EXPIRES_SECONDS": "900",
     "R2_ACCOUNT_ID": "REPLACE_WITH_CLOUDFLARE_ACCOUNT_ID",

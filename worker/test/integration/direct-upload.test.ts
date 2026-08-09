@@ -4,7 +4,7 @@ import { applyMigration, createKey, putDirectUploadObject, ROOT_KEY } from '../h
 import * as fileRepo from '../../src/repositories/file-repository';
 import { AuditService } from '../../src/services/audit-service';
 import { CleanupService } from '../../src/services/cleanup-service';
-import { promoteDirectUpload, stagingObjectKey } from '../../src/services/direct-upload-service';
+import { promoteDirectUpload, signDirectPut, stagingObjectKey } from '../../src/services/direct-upload-service';
 
 beforeAll(applyMigration);
 
@@ -18,6 +18,11 @@ async function initiate(apiKey: string, sizeBytes: number, filename = 'direct.bi
 }
 
 describe('R2 直传协议', () => {
+  it('未配置直传时返回稳定错误码，供页面本地化', async () => {
+    await expect(signDirectPut({ ...env, R2_ACCESS_KEY_ID: '', R2_SECRET_ACCESS_KEY: '' }, 'uploads/test', 'text/plain'))
+      .rejects.toMatchObject({ code: 'direct_upload_not_configured', status: 500 });
+  });
+
   it('JSON 元数据请求超过 64 KiB 时在解析前拒绝', async () => {
     const key = await createKey('direct-json-limit');
     const response = await SELF.fetch('http://localhost/api/files', {

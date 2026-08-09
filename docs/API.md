@@ -24,14 +24,17 @@
 |---|---|
 | `GET /` | 说明页 |
 | `GET /healthz` | 健康检查 |
-| `GET /d/:token` | 公开下载(浏览器返回文件;`Accept: application/json` 时错误返回 JSON) |
+| `GET /d/:token` | 文件详情页；`Accept: application/json` 返回机器可读元数据，不消耗下载次数 |
+| `GET /d/:token/file` | 公开文件下载；原子消耗下载次数，浏览器错误返回 HTML，`Accept: application/json` 时错误返回 JSON |
 | `GET /u/:token` | 一次性上传页面 |
 | `POST /u/:token/initiate` | 声明文件元数据并领取一次性 R2 直传会话 |
 | `POST /u/:token/complete` | R2 PUT 完成后确认上传 |
 
-`GET /`、`GET /u/:token` 与浏览器 HTML 错误页支持 `en` 和 `zh-CN`。语言选择优先级为
+`GET /`、`GET /u/:token`、`GET /d/:token` 与浏览器 HTML 错误页支持 `en` 和 `zh-CN`。语言选择优先级为
 `?lang=`、带权重的 `Accept-Language`、默认 `zh-CN`；响应返回 `Content-Language` 与
-`Vary: Accept-Language`。JSON API 的错误码与响应结构不随语言变化。
+`Vary: Accept-Language`。页面中的日期保留 ISO 8601 `datetime`，可见文案由浏览器按访问者本地
+时区格式化，并明确显示 UTC Offset 与 IANA 时区。JSON API 的错误码与响应结构不随语言变化；
+页面根据稳定错误码选择本地化文案，不直接展示服务端英文 message。
 
 ## 普通 API Key 路由(`/api`)
 
@@ -66,8 +69,9 @@
 }
 ```
 
-请求 JSON：`filename`、`size_bytes`、`content_type`，可选 `expires_in`、`max_downloads`、
-`burn_after_read`。客户端必须严格使用返回的 method/headers PUT 文件正文，随后调用 complete；在
+请求 JSON：`filename`、`size_bytes`、`content_type`，可选 `description`（去除首尾空白后最多
+2000 字符）、`expires_in`、`max_downloads`、`burn_after_read`。客户端必须严格使用返回的
+method/headers PUT 文件正文，随后调用 complete；在
 complete 成功前公开下载返回 `file_not_ready`。
 
 presigned URL 在有效期内可重复 PUT，因此 `upload_url` 只对应暂存 Key；完成接口不会直接发布该 Key，
@@ -75,6 +79,35 @@ presigned URL 在有效期内可重复 PUT，因此 `upload_url` 只对应暂存
 
 公开 Inbox 直传采用相同协议。initiate 返回 `file_id`、`upload_id`、`upload_url`、
 `upload_method`、`upload_headers`；complete 请求 JSON 为 `file_id` 与 `upload_id`。
+Inbox 上传页面同样允许填写最多 2000 字符的文件描述。
+
+### 公开下载详情
+
+分享 URL 指向 `/d/:token`。浏览器获得独立详情页，显示文件名、上传完成时间、大小、可选描述和
+下载按钮；读取详情不会消耗下载次数或触发阅后即焚。页面使用语义化 HTML、Schema.org JSON-LD，
+并支持机器客户端请求：
+
+```http
+GET /d/<token>
+Accept: application/json
+```
+
+```json
+{
+  "ok": true,
+  "data": {
+    "filename": "report.pdf",
+    "size_bytes": 12345,
+    "description": "Quarterly report",
+    "content_type": "application/pdf",
+    "uploaded_at": "2026-08-09T08:00:00.000Z",
+    "expires_at": "2026-08-10T08:00:00.000Z",
+    "download_url": "https://files.example.com/d/<token>/file"
+  }
+}
+```
+
+真正下载必须请求响应中的 `download_url`。只有该端点会原子领取下载额度。
 
 ### 接收链接
 
@@ -141,7 +174,7 @@ presigned URL 在有效期内可重复 PUT，因此 `upload_url` 只对应暂存
 | `upload_session_expired` | 410 | 直传会话已过期 |
 | `file_too_large` / `request_too_large` | 413 | 文件声明或 JSON 请求体过大 |
 | `file_type_not_allowed` | 415 | 类型不允许 |
-| `internal_error` | 500 | 内部错误 |
+| `direct_upload_not_configured` / `internal_error` | 500 | 直传存储未配置或内部错误 |
 | `quota_exceeded` / `rate_limited` | 429 | 配额/限流 |
 
 ## 下载响应头

@@ -45,6 +45,7 @@ export function tenantFilesRoutes(app: Hono): void {
       maxDownloads: b.max_downloads ?? null,
       burnAfterRead: b.burn_after_read,
       filename: b.filename,
+      description: b.description,
       contentType: b.content_type,
       sizeBytes: b.size_bytes,
       requestId: meta.requestId,

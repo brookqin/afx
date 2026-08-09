@@ -88,9 +88,10 @@ export function tenantInboxesRoutes(app: Hono): void {
         data.file = {
           id: file.id,
           filename: file.original_name,
+          description: file.description,
           size_bytes: file.size_bytes,
           content_type: file.content_type,
-          created_at: toIso(file.created_at),
+          uploaded_at: toIso(file.ready_at ?? file.created_at),
           status: file.status,
         };
       }

@@ -37,6 +37,9 @@ var uploadCmd = &cobra.Command{
 		if uploadBurn {
 			query.Set("burn_after_read", "true")
 		}
+		if uploadDescription != "" {
+			query.Set("description", uploadDescription)
+		}
 
 		data, err := client.UploadFile(context.Background(), args[0], query)
 		if err != nil {
@@ -52,13 +55,15 @@ var uploadCmd = &cobra.Command{
 }
 
 var (
-	uploadExpires   string
-	uploadDownloads int
-	uploadBurn      bool
+	uploadExpires     string
+	uploadDownloads   int
+	uploadBurn        bool
+	uploadDescription string
 )
 
 func init() {
 	uploadCmd.Flags().StringVar(&uploadExpires, "expires", "", "lifetime, for example 24h or 1h30m")
 	uploadCmd.Flags().IntVar(&uploadDownloads, "downloads", 0, "maximum downloads (0 means unlimited)")
 	uploadCmd.Flags().BoolVar(&uploadBurn, "burn", false, "burn after reading (forces max_downloads=1)")
+	uploadCmd.Flags().StringVar(&uploadDescription, "description", "", "file description (maximum 2000 characters)")
 }

@@ -120,7 +120,7 @@ export AFX_ENDPOINT=https://files.example.com
 export AFX_API_KEY=afx_...
 export AFX_ROOT_API_KEY=afx_root_...
 
-./cli/afx upload report.pdf --expires 24h --json
+./cli/afx upload report.pdf --description "季度报告" --expires 24h --json
 ./cli/afx inbox create --expires 1h --title "Upload logs" --json
 ./cli/afx inbox wait <inbox-id> --timeout 1h --download --output . --json
 ```

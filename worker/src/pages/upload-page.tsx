@@ -6,6 +6,7 @@
 import type { FC } from 'hono/jsx';
 import { localeQuery, messages, type Locale } from '../i18n';
 import type { InboxRow } from '../repositories/inbox-repository';
+import { MAX_FILE_DESCRIPTION_LENGTH } from '../schemas/upload';
 import { Layout } from './layout';
 
 function formatBytes(n: number): string {
@@ -13,10 +14,6 @@ function formatBytes(n: number): string {
   if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MiB';
   if (n >= 1024) return (n / 1024).toFixed(1) + ' KiB';
   return String(n) + ' B';
-}
-
-function formatDate(ms: number, locale: Locale): string {
-  return new Date(ms).toLocaleString(locale, { hour12: false });
 }
 
 interface UploadPageProps {
@@ -36,31 +33,57 @@ export const UploadPage: FC<UploadPageProps> = ({ inbox, token, locale }) => {
 
   return (
     <Layout title={inbox.title || copy.uploadDefaultTitle} locale={locale}>
-      <nav class="locale" aria-label="Language">
-        <a href={`?lang=${localeQuery('zh-CN')}`} aria-current={locale === 'zh-CN' ? 'page' : undefined}>中文</a>
-        <span> / </span>
-        <a href={`?lang=${localeQuery('en')}`} aria-current={locale === 'en' ? 'page' : undefined}>EN</a>
-      </nav>
-      <h1>{inbox.title || copy.uploadDefaultTitle}</h1>
-      {inbox.description ? <p>{inbox.description}</p> : null}
-      <p class="meta">
-        {copy.maxFileSize}: {formatBytes(inbox.max_file_size_bytes)}
-        {hint ? <span> · {hint}</span> : null}
-      </p>
-      <p class="meta">{copy.deadline}: {formatDate(inbox.expires_at, locale)}</p>
-
-      <form id="upload-form" data-base={`/u/${token}`} data-lang={localeQuery(locale)}>
-        <div class="file-row">
-          <input type="file" name="file" id="file-input" required />
+      <header class="card-header">
+        <span class="eyebrow">{copy.uploadEyebrow}</span>
+        <h1>{inbox.title || copy.uploadDefaultTitle}</h1>
+        {inbox.description ? <p class="lead">{inbox.description}</p> : null}
+      </header>
+      <div class="separator" />
+      <section class="card-content">
+        <div class="meta-grid">
+          <div class="meta-item">
+            <span class="meta-label">{copy.maxFileSize}</span>
+            <span class="meta-value">{formatBytes(inbox.max_file_size_bytes)}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">{copy.deadline}</span>
+            <time class="meta-value" dateTime={new Date(inbox.expires_at).toISOString()} data-local-date>{new Date(inbox.expires_at).toISOString()}</time>
+          </div>
         </div>
-        <button type="submit" class="btn" id="submit-btn">{copy.uploadButton}</button>
-        <div class="bar" id="bar" hidden>
-          <div id="bar-fill" />
-        </div>
-        <p class="status" id="status" role="status" />
-      </form>
+        {hint ? <p class="hint">{hint}</p> : null}
 
-      <script dangerouslySetInnerHTML={{ __html: buildUploadScript(copy.uploadClient) }} />
+        <form id="upload-form" data-base={`/u/${token}`} data-lang={localeQuery(locale)}>
+          <div class="field">
+            <span class="field-label">{copy.chooseFile}</span>
+            <div class="file-row">
+              <input class="file-input" type="file" name="file" id="file-input" required />
+              <label class="file-picker" for="file-input">{copy.chooseFile}</label>
+              <span class="file-name" id="file-name">{copy.noFileSelected}</span>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label" for="file-description">
+              <span>{copy.fileDescription}</span>
+              <span class="field-hint">{copy.fileDescriptionHint}</span>
+            </label>
+            <textarea
+              id="file-description"
+              name="description"
+              maxlength={MAX_FILE_DESCRIPTION_LENGTH}
+              rows={4}
+            />
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn" id="submit-btn">{copy.uploadButton}</button>
+          </div>
+          <div class="bar" id="bar" hidden>
+            <div id="bar-fill" />
+          </div>
+          <p class="status" id="status" role="status" />
+        </form>
+      </section>
+
+      <script dangerouslySetInnerHTML={{ __html: buildUploadScript(copy.uploadClient, copy.errors, copy.noFileSelected) }} />
     </Layout>
   );
 };
@@ -74,18 +97,32 @@ function safeArray(json: string): string[] {
   }
 }
 
-function buildUploadScript(copy: ReturnType<typeof messages>['uploadClient']): string {
-  const serialized = JSON.stringify(copy).replace(/</g, '\\u003c');
+function buildUploadScript(
+  copy: ReturnType<typeof messages>['uploadClient'],
+  errors: ReturnType<typeof messages>['errors'],
+  noFileSelected: string,
+): string {
+  const serialized = JSON.stringify({
+    ...copy,
+    noFileSelected,
+    errorMessages: Object.fromEntries(Object.entries(errors).map(([code, value]) => [code, value.message])),
+  }).replace(/</g, '\\u003c');
   return `
 (function () {
   var copy = ${serialized};
   var form = document.getElementById('upload-form');
   var fileInput = document.getElementById('file-input');
+  var fileName = document.getElementById('file-name');
   var submitBtn = document.getElementById('submit-btn');
+  var descriptionInput = document.getElementById('file-description');
   var status = document.getElementById('status');
   var bar = document.getElementById('bar');
   var fill = document.getElementById('bar-fill');
   if (!form) return;
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files && fileInput.files[0];
+    fileName.textContent = file ? file.name : copy.noFileSelected;
+  });
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
     var file = fileInput.files && fileInput.files[0];
@@ -100,10 +137,18 @@ function buildUploadScript(copy: ReturnType<typeof messages>['uploadClient']): s
       var initRes = await fetch(base + '/initiate?lang=' + lang, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ filename: file.name, size_bytes: file.size, content_type: file.type || null })
+        body: JSON.stringify({
+          filename: file.name,
+          size_bytes: file.size,
+          content_type: file.type || null,
+          description: descriptionInput.value.trim() || null
+        })
       });
       var initBody = await initRes.json();
-      if (!initRes.ok || !initBody.ok) throw new Error(initBody.error && initBody.error.message || copy.initiateFailed);
+      if (!initRes.ok || !initBody.ok) {
+        var errorCode = initBody.error && initBody.error.code;
+        throw new Error(copy.errorMessages[errorCode] || copy.initiateFailed);
+      }
 
       status.textContent = copy.uploading;
       await new Promise(function (resolve, reject) {

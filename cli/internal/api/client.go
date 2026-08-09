@@ -124,6 +124,9 @@ func (c *Client) UploadFile(ctx context.Context, filePath string, query url.Valu
 	if value := query.Get("burn_after_read"); value == "true" || value == "1" {
 		body["burn_after_read"] = true
 	}
+	if value := query.Get("description"); value != "" {
+		body["description"] = value
+	}
 
 	initData, err := c.DoJSON(ctx, "POST", "/api/files", nil, body)
 	if err != nil {

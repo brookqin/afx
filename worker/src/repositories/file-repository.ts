@@ -12,6 +12,7 @@ export interface FileRow {
   source: FileSource;
   object_key: string;
   original_name: string;
+  description: string | null;
   content_type: string | null;
   size_bytes: number;
   sha256: string | null;
@@ -44,6 +45,7 @@ export interface CreateFileInput {
   source: FileSource;
   objectKey: string;
   originalName: string;
+  description?: string | null;
   contentType: string | null;
   sizeBytes: number;
   sha256: string | null;
@@ -59,7 +61,7 @@ export interface CreateFileInput {
 }
 
 const SELECT_COLUMNS = `
-  id, owner_key_id, source, object_key, original_name, content_type,
+  id, owner_key_id, source, object_key, original_name, description, content_type,
   size_bytes, sha256, public_token_hash, status,
   created_at, ready_at, expires_at, consumed_at, expired_at, deleted_at,
   max_downloads, download_count, failed_download_count, burn_after_read,
@@ -76,11 +78,11 @@ export async function createFile(db: D1Database, input: CreateFileInput): Promis
   await db
     .prepare(
       `INSERT INTO files (
-        id, owner_key_id, source, object_key, original_name, content_type,
+        id, owner_key_id, source, object_key, original_name, description, content_type,
         size_bytes, sha256, public_token_hash, status,
         created_at, ready_at, expires_at,
         max_downloads, burn_after_read, inbox_id, metadata_json, upload_expires_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -88,6 +90,7 @@ export async function createFile(db: D1Database, input: CreateFileInput): Promis
       input.source,
       input.objectKey,
       input.originalName,
+      input.description ?? null,
       input.contentType,
       input.sizeBytes,
       input.sha256,

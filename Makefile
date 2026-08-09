@@ -1,4 +1,4 @@
-.PHONY: build test test-worker test-cli typecheck migrate deploy worker-dev
+.PHONY: build test test-worker test-cli typecheck privacy-check migrate deploy worker-dev
 
 CLI_VERSION ?= dev
 CLI_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || printf unknown)
@@ -10,7 +10,11 @@ build:
 	cd cli && go build -trimpath -ldflags "$(CLI_LDFLAGS)" -o afx .
 
 # 全部测试
-test: test-worker test-cli
+test: privacy-check test-worker test-cli
+
+# 防止真实部署标识或本机身份信息进入开源仓库
+privacy-check:
+	node scripts/check-public-config.mjs
 
 # Worker 测试(Vitest,workers pool)
 test-worker:

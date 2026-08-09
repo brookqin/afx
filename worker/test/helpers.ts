@@ -5,6 +5,7 @@
 import { env, SELF } from 'cloudflare:test';
 import { vi } from 'vitest';
 import migrationSql from '../migrations/0001_initial.sql?raw';
+import fileDescriptionMigrationSql from '../migrations/0002_file_description.sql?raw';
 import { stagingObjectKey } from '../src/services/direct-upload-service';
 
 // 主 Worker 与测试位于同一 isolate；拦截出站 CopyObject，避免访问真实 R2 S3 端点。
@@ -16,6 +17,7 @@ export async function applyMigration(): Promise<void> {
   // 每测试文件独立存储(isolatedStorage),直接逐条应用 Migration
   // D1 exec 对多语句/注释解析严格:折叠空白为单行语句,逐条执行
   await applySql(migrationSql);
+  await applySql(fileDescriptionMigrationSql);
 }
 
 async function applySql(sql: string): Promise<void> {
@@ -64,6 +66,7 @@ export async function uploadFile(
   content: string | Uint8Array,
   filename: string,
   query = '',
+  description?: string,
 ): Promise<{ id: string; url: string; status: number; body: any }> {
   const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content;
   const params = new URLSearchParams(query.startsWith('?') ? query.slice(1) : query);
@@ -75,6 +78,7 @@ export async function uploadFile(
   if (params.has('expires_in')) requestBody.expires_in = Number(params.get('expires_in'));
   if (params.has('max_downloads')) requestBody.max_downloads = Number(params.get('max_downloads'));
   if (params.get('burn_after_read') === 'true' || params.get('burn_after_read') === '1') requestBody.burn_after_read = true;
+  if (description !== undefined) requestBody.description = description;
 
   const initiated = await SELF.fetch('http://localhost/api/files', {
     method: 'POST',
