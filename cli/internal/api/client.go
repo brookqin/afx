@@ -51,6 +51,36 @@ func New(baseURL, apiKey string) *Client {
 	}
 }
 
+// Health checks the unauthenticated service health endpoint.
+func (c *Client) Health(ctx context.Context) (map[string]any, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/healthz", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", c.UserAgent)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, &TimeoutError{Err: err}
+		}
+		return nil, &NetworkError{Err: err}
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return nil, &NetworkError{Err: err}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, &ServerError{Status: resp.StatusCode, Body: truncate(string(raw), 500)}
+	}
+	var data map[string]any
+	if err := json.Unmarshal(raw, &data); err != nil || data["ok"] != true {
+		return nil, fmt.Errorf("invalid health response")
+	}
+	return data, nil
+}
+
 // DoJSON 发起 JSON 请求并解析统一响应。返回 data 字段(可能为 null)。
 func (c *Client) DoJSON(ctx context.Context, method, path string, query url.Values, body any) (any, error) {
 	var bodyReader io.Reader

@@ -66,3 +66,30 @@ func TestLoadMissingFileUsesDefaults(t *testing.T) {
 		t.Errorf("endpoint = %q", cfg.Endpoint)
 	}
 }
+
+func TestLoadWithSources(t *testing.T) {
+	home := t.TempDir()
+	cfgPath := filepath.Join(home, "config.toml")
+	if err := os.WriteFile(cfgPath, []byte("endpoint = \"http://file.example.com\"\napi_key = \"file-key\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ConfigPath = func() string { return cfgPath }
+	defer func() { ConfigPath = func() string { return "" } }()
+
+	t.Setenv("AFX_ENDPOINT", "http://env.example.com")
+	t.Setenv("AFX_API_KEY", "")
+	t.Setenv("AFX_ROOT_API_KEY", "")
+	cfg, sources, err := LoadWithSources()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Endpoint != "http://env.example.com" || sources.Endpoint != "environment" {
+		t.Fatalf("endpoint = %q, source = %q", cfg.Endpoint, sources.Endpoint)
+	}
+	if cfg.APIKey != "file-key" || sources.APIKey != "config_file" {
+		t.Fatalf("api key source = %q", sources.APIKey)
+	}
+	if !sources.ConfigFilePresent || sources.RootAPIKey != "none" {
+		t.Fatalf("sources = %+v", sources)
+	}
+}

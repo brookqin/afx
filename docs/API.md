@@ -38,6 +38,16 @@
 
 ## 普通 API Key 路由(`/api`)
 
+### 配置状态
+
+| 路由 | 说明 |
+|---|---|
+| `GET /api/status` | 校验普通 API Key，不要求业务 Scope；返回 Key 名称、Scope 与文件大小/有效期限制，不返回任何密钥材料 |
+
+CLI 使用该端点实现 `afx status --json`。未配置 API Key 时，CLI 只请求公开的 `/healthz` 并返回
+`data.state: "unconfigured"`；Key 校验成功时返回 `data.state: "ready"`。无效、停用或已吊销 Key
+继续使用统一错误码和非零退出码。
+
 ### 文件
 
 | 路由 | 说明 |

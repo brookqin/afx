@@ -118,6 +118,25 @@ func TestDoJSONNotFound(t *testing.T) {
 	}
 }
 
+func TestHealth(t *testing.T) {
+	srv := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/healthz" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "" {
+			t.Fatal("health request must not include authorization")
+		}
+		fmt.Fprint(w, `{"ok":true,"status":"ok","time":"2026-08-09T00:00:00Z"}`)
+	})
+	data, err := New(srv.URL, "must-not-leak").Health(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data["status"] != "ok" {
+		t.Fatalf("data = %#v", data)
+	}
+}
+
 func TestDownload(t *testing.T) {
 	srv := testServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", `attachment; filename="report.pdf"; filename*=UTF-8''report.pdf`)

@@ -17,6 +17,7 @@ import { publicUploadCompleteHandler, publicUploadInitiateHandler, publicUploadP
 import { tenantFilesRoutes } from './routes/tenant-files';
 import { tenantInboxesRoutes } from './routes/tenant-inboxes';
 import { tenantAuditRoutes, tenantStatsRoutes } from './routes/tenant-audit';
+import { tenantStatusRoutes } from './routes/tenant-status';
 import { rootKeysRoutes } from './routes/root-keys';
 import { rootFilesRoutes } from './routes/root-files';
 import { rootInboxesRoutes } from './routes/root-inboxes';
@@ -70,6 +71,7 @@ export function createApp(): Hono {
 
   // 普通 API Key 路由(§13.2)
   const tenant = new Hono();
+  tenantStatusRoutes(tenant);
   tenantFilesRoutes(tenant);
   tenantInboxesRoutes(tenant);
   tenantAuditRoutes(tenant);

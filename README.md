@@ -98,7 +98,7 @@ npx wrangler d1 migrations apply agent-file-exchange --remote
 npx wrangler deploy
 ```
 
-This repository has not been released or deployed yet, so `worker/migrations/0001_initial.sql` is the single source of truth for a new database. There are no incremental `ALTER TABLE` migrations.
+Apply every migration in `worker/migrations/` in order. Wrangler records completed migrations and applies only pending files.
 
 ### 2. Build and use the CLI
 
@@ -120,12 +120,16 @@ export AFX_ENDPOINT=https://files.example.com
 export AFX_API_KEY=afx_...
 export AFX_ROOT_API_KEY=afx_root_...
 
+./cli/afx status --json
+
 ./cli/afx upload report.pdf --description "Quarterly report" --expires 24h --json
 ./cli/afx inbox create --expires 1h --title "Upload logs" --json
 ./cli/afx inbox wait <inbox-id> --timeout 1h --download --output . --json
 ```
 
 Run `./cli/afx --help` for the full English command reference.
+
+`afx status --json` reports the resolved endpoint and configuration sources without exposing keys. It verifies service connectivity when no tenant key is configured and validates the key through the scope-independent authenticated status endpoint when one is present.
 
 Pushing a semantic version tag such as `v1.2.3` runs the CLI release workflow. It tests and publishes Linux, macOS, and Windows archives for amd64 and arm64 together with `checksums.txt`.
 
