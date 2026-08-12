@@ -100,6 +100,60 @@ npx wrangler deploy
 
 Apply every migration in `worker/migrations/` in order. Wrangler records completed migrations and applies only pending files.
 
+#### Store the Root API key after deployment
+
+Cloudflare stores only `ROOT_API_KEY_HASH`; it cannot recover the plaintext Root API key. Immediately after deployment:
+
+1. Save the Root API key in a durable, cross-device password manager as `AFX Root API Key — <endpoint>`. Record the canonical HTTPS endpoint without a trailing slash and the creation date. This is the recovery copy.
+2. On each administration machine, add an operational copy to the OS credential store using the standard locator below. Do not make this device-local copy the only copy.
+3. Never store the Root API key in the repository, `config.toml`, `.env`, `.dev.vars`, shell startup files or history, chat, or a plaintext file—even when that file is Git-ignored. Do not pass it through `--root-key`.
+
+Use `dev.qiankun.afx.root-api-key` as the service or secret name and the canonical endpoint as its account or lookup key:
+
+**macOS Keychain**
+
+```bash
+export AFX_ENDPOINT=https://files.example.com
+security add-generic-password -U \
+  -s dev.qiankun.afx.root-api-key \
+  -a "$AFX_ENDPOINT" \
+  -l "AFX Root API Key ($AFX_ENDPOINT)" \
+  -w
+```
+
+Keep `-w` last so Keychain prompts without placing the secret in command history.
+
+**Linux Secret Service** (`secret-tool`)
+
+```bash
+export AFX_ENDPOINT=https://files.example.com
+secret-tool store \
+  --label="AFX Root API Key ($AFX_ENDPOINT)" \
+  application afx credential root-api-key endpoint "$AFX_ENDPOINT"
+```
+
+Run it from a terminal so Secret Service prompts for the value.
+
+**Windows PowerShell SecretManagement** (with a registered default vault)
+
+```powershell
+$env:AFX_ENDPOINT = 'https://files.example.com'
+Set-Secret -Name "dev.qiankun.afx.root-api-key::$env:AFX_ENDPOINT"
+```
+
+`Set-Secret` prompts for a `SecureString` when the value is omitted. A password-manager-backed SecretManagement vault is preferred when one is available.
+
+For an explicitly authorized administration command, retrieve the key only for that process and then clear it. For example, on macOS:
+
+```bash
+AFX_ROOT_API_KEY="$(security find-generic-password \
+  -s dev.qiankun.afx.root-api-key \
+  -a "$AFX_ENDPOINT" \
+  -w)" afx admin stats --json
+```
+
+The Agent Skill below defines the equivalent Linux and Windows lookup rules. If the recovery copy or OS credential-store record cannot be read, stop; do not search files or rotate the Root key automatically.
+
 ### 2. Build and use the CLI
 
 Install the latest macOS or Linux release with checksum verification:
@@ -118,7 +172,6 @@ Alternatively, build from source:
 make build
 export AFX_ENDPOINT=https://files.example.com
 export AFX_API_KEY=afx_...
-export AFX_ROOT_API_KEY=afx_root_...
 
 ./cli/afx status --json
 

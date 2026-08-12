@@ -100,6 +100,60 @@ npx wrangler deploy
 
 按顺序应用 `worker/migrations/` 中的全部 Migration；Wrangler 会记录已完成项并只执行待应用文件。
 
+#### 部署成功后保存 Root API Key
+
+Cloudflare 只保存 `ROOT_API_KEY_HASH`，无法恢复 Root API Key 明文。部署成功后应立即完成以下操作：
+
+1. 在支持跨设备同步和恢复的密码管理器中保存 Root API Key，条目名称统一为 `AFX Root API Key — <endpoint>`，并记录不带末尾 `/` 的规范 HTTPS Endpoint 与创建日期。它是恢复副本。
+2. 在每台管理机器上，将操作副本写入系统凭据库，并使用下述统一定位规则。不要把单台设备上的副本作为唯一备份。
+3. 不要把 Root API Key 放进仓库、`config.toml`、`.env`、`.dev.vars`、Shell 启动文件或历史、聊天消息、任何明文文件；即使文件已被 Git 忽略也不安全。不要通过 `--root-key` 传入。
+
+统一使用 `dev.qiankun.afx.root-api-key` 作为服务或 Secret 名称，并用规范 Endpoint 作为账号或查询键：
+
+**macOS Keychain**
+
+```bash
+export AFX_ENDPOINT=https://files.example.com
+security add-generic-password -U \
+  -s dev.qiankun.afx.root-api-key \
+  -a "$AFX_ENDPOINT" \
+  -l "AFX Root API Key ($AFX_ENDPOINT)" \
+  -w
+```
+
+把 `-w` 放在命令末尾，让 Keychain 安全提示输入，避免密钥进入命令历史。
+
+**Linux Secret Service**（`secret-tool`）
+
+```bash
+export AFX_ENDPOINT=https://files.example.com
+secret-tool store \
+  --label="AFX Root API Key ($AFX_ENDPOINT)" \
+  application afx credential root-api-key endpoint "$AFX_ENDPOINT"
+```
+
+应在终端中运行，让 Secret Service 提示输入密钥。
+
+**Windows PowerShell SecretManagement**（已注册默认 Vault）
+
+```powershell
+$env:AFX_ENDPOINT = 'https://files.example.com'
+Set-Secret -Name "dev.qiankun.afx.root-api-key::$env:AFX_ENDPOINT"
+```
+
+省略值时，`Set-Secret` 会提示输入 `SecureString`。如果已有密码管理器提供的 SecretManagement Vault，应优先使用它。
+
+只有在用户明确授权管理操作时，才为单个进程取出 Root Key，并在操作后清理。例如 macOS：
+
+```bash
+AFX_ROOT_API_KEY="$(security find-generic-password \
+  -s dev.qiankun.afx.root-api-key \
+  -a "$AFX_ENDPOINT" \
+  -w)" afx admin stats --json
+```
+
+下方 Agent Skill 定义了 Linux 与 Windows 的等价读取规则。无法读取恢复副本或系统凭据库记录时应停止，不要搜索文件，也不要自动轮换 Root Key。
+
 ### 2. 构建和使用 CLI
 
 macOS 或 Linux 可自动安装最新 Release，并校验 SHA-256：
@@ -118,7 +172,6 @@ afx version
 make build
 export AFX_ENDPOINT=https://files.example.com
 export AFX_API_KEY=afx_...
-export AFX_ROOT_API_KEY=afx_root_...
 
 ./cli/afx status --json
 

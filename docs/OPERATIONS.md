@@ -20,13 +20,18 @@ npx wrangler r2 bucket create agent-file-exchange
 
 # 2. 编辑 wrangler.jsonc:填入 database_id、bucket 名称、PUBLIC_BASE_URL
 
-# 3. 离线生成并妥善保存 Root Key/Hash；使用准备写入 ROOT_API_KEY_PEPPER 的同一值
+# 3. 离线生成 Root Key/Hash；使用准备写入 ROOT_API_KEY_PEPPER 的同一值
 node -e "
 const c = require('crypto');
 const s = c.randomBytes(32).toString('base64url');
 console.log('Root Key(保存一次): afx_root_' + s);
 console.log('ROOT_API_KEY_HASH = ' + c.createHmac('sha256', '<ROOT_API_KEY_PEPPER 的值>').update(s).digest('hex'));
 "
+
+# 生成后立即按 README.zh-CN.md 的跨平台约定保存 Root Key：
+# - 密码管理器中的恢复副本
+# - 系统凭据库中的操作副本
+# Cloudflare 只有 Hash，无法恢复明文；Git 忽略的明文文件也不是安全存储。
 
 # 4. 配置 Secrets(全部必填，ROOT_API_KEY_HASH 使用上一步结果)
 npx wrangler secret put ROOT_API_KEY_HASH

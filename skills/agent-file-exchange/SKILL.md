@@ -81,7 +81,44 @@ After deployment, create a least-privilege tenant key and configure only its end
 
 `AFX_ROOT_API_KEY` is the global administrator credential for explicit `afx admin ...` operations. It is not an R2 token and is never needed for routine file or inbox operations.
 
-Keep the Root key in a password manager or OS credential store. Do not put `root_api_key` in normal Skill configuration, source control, chat, logs, command arguments, or user-visible output. Load it ephemerally only when the user explicitly requests administration, perform the minimum operation, then unset it.
+Keep the recovery copy in a durable, cross-device password manager. Keep an optional operational copy in the current machine's OS credential store; never treat that device-local copy as the only backup. Do not put `root_api_key` in normal Skill configuration, source control, Git-ignored plaintext files, chat, logs, command arguments, or user-visible output.
+
+Use this standard credential locator for every deployment:
+
+- Canonical endpoint: the configured HTTPS endpoint with trailing `/` characters removed.
+- macOS Keychain: service `dev.qiankun.afx.root-api-key`, account equal to the canonical endpoint.
+- Linux Secret Service: attributes `application=afx`, `credential=root-api-key`, and `endpoint=<canonical endpoint>`.
+- Windows PowerShell SecretManagement: secret name `dev.qiankun.afx.root-api-key::<canonical endpoint>` in the registered default vault.
+
+For an explicitly requested `afx admin ...` operation, resolve the Root key in this order:
+
+1. Use `AFX_ROOT_API_KEY` only when it is already present in the process environment. Never print it.
+2. Otherwise, obtain the exact endpoint from `status --json`, canonicalize it, detect the OS, and read only the standard record:
+   - macOS: `security find-generic-password -s dev.qiankun.afx.root-api-key -a "$AFX_ENDPOINT" -w`
+   - Linux: `secret-tool lookup application afx credential root-api-key endpoint "$AFX_ENDPOINT"`
+   - Windows PowerShell: `Get-Secret -Name "dev.qiankun.afx.root-api-key::$env:AFX_ENDPOINT" -AsPlainText`
+3. Require a non-empty value beginning with `afx_root_`. Keep it in memory, pass it through `AFX_ROOT_API_KEY` only for the authorized CLI process, then unset or remove the variable.
+4. If the platform credential command or exact record is unavailable, stop and ask the user to provision the standard record from their password-manager recovery copy. Never enumerate unrelated credential records, search files or shell history, request the Root key in chat, or rotate it automatically.
+
+On POSIX systems, scope the retrieved value to one command without displaying it:
+
+```sh
+AFX_ROOT_API_KEY="$ROOT_KEY" "$AFX_BIN" admin stats --json
+unset ROOT_KEY
+```
+
+On Windows PowerShell, set the environment variable only inside `try`/`finally` and remove it in `finally`:
+
+```powershell
+$rootKey = Get-Secret -Name "dev.qiankun.afx.root-api-key::$env:AFX_ENDPOINT" -AsPlainText
+try {
+  $env:AFX_ROOT_API_KEY = $rootKey
+  afx admin stats --json
+} finally {
+  Remove-Item Env:AFX_ROOT_API_KEY -ErrorAction SilentlyContinue
+  Remove-Variable rootKey -ErrorAction SilentlyContinue
+}
+```
 
 To create a tenant key for the complete workflow:
 
