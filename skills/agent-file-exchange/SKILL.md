@@ -54,14 +54,22 @@ export AFX_ENDPOINT="https://files.example.com"
 export AFX_API_KEY="afx_replace_with_tenant_key"
 ```
 
-For persistent local configuration, create `~/.config/afx/config.toml`:
+For persistent local configuration, create `dev.qiankun.afx/config.toml` under the platform user configuration directory returned by `os.UserConfigDir`:
+
+- macOS: `$HOME/Library/Application Support/dev.qiankun.afx/config.toml`
+- Linux: `$XDG_CONFIG_HOME/dev.qiankun.afx/config.toml`, or `$HOME/.config/dev.qiankun.afx/config.toml` when `XDG_CONFIG_HOME` is unset
+- Windows: `%AppData%\dev.qiankun.afx\config.toml`
+
+The CLI does not generate or migrate this file. Create it only after the user authorizes persistent configuration, using:
 
 ```toml
 endpoint = "https://files.example.com"
 api_key = "afx_replace_with_tenant_key"
 ```
 
-Set the directory to mode `0700` and the file to mode `0600`. Never commit or upload it. Resolution order is command flags, environment variables, config file, then the default endpoint `http://localhost:8787`; an API key has no default. Avoid `--api-key` and `--root-key` because command arguments can enter history or process listings.
+On macOS and Linux, set the directory to mode `0700` and the file to mode `0600`. On Windows, restrict the directory and file ACLs to the current user. Never commit or upload it. Resolution order is command flags, environment variables, config file, then the default endpoint `http://localhost:8787`; an API key has no default. Avoid `--api-key` and `--root-key` because command arguments can enter history or process listings.
+
+`status --json` reports the exact path at `data.config.config_file`. This is a breaking path change: never read or migrate earlier `afx/config.toml` or `~/.config/afx/config.toml` locations automatically.
 
 Run `status --json` again and require `data.state: "ready"`.
 

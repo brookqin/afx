@@ -184,6 +184,8 @@ Run `./cli/afx --help` for the full English command reference.
 
 `afx status --json` reports the resolved endpoint and configuration sources without exposing keys. It verifies service connectivity when no tenant key is configured and validates the key through the scope-independent authenticated status endpoint when one is present.
 
+The CLI does not generate or migrate its persistent configuration. Create `dev.qiankun.afx/config.toml` manually under the platform user configuration directory: `$HOME/Library/Application Support` on macOS, `$XDG_CONFIG_HOME` (or `$HOME/.config`) on Linux, and `%AppData%` on Windows. `data.config.config_file` from `afx status --json` reports the exact path. This is a breaking path: earlier `afx/config.toml` and `~/.config/afx/config.toml` locations are not read.
+
 Pushing a semantic version tag such as `v1.2.3` runs the CLI release workflow. It tests and publishes Linux, macOS, and Windows archives for amd64 and arm64 together with `checksums.txt`.
 
 ### 3. Develop and test

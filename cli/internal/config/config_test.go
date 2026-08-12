@@ -7,9 +7,27 @@ import (
 	"testing"
 )
 
+func useConfigPath(t *testing.T, path string) {
+	t.Helper()
+	oldPath := ConfigPath
+	ConfigPath = func() string { return path }
+	t.Cleanup(func() { ConfigPath = oldPath })
+}
+
+func TestConfigPathUsesUserConfigDir(t *testing.T) {
+	oldUserConfigDir := userConfigDir
+	userConfigDir = func() (string, error) { return filepath.Join("platform", "config"), nil }
+	t.Cleanup(func() { userConfigDir = oldUserConfigDir })
+
+	want := filepath.Join("platform", "config", "dev.qiankun.afx", "config.toml")
+	if got := ConfigPath(); got != want {
+		t.Fatalf("ConfigPath() = %q, want %q", got, want)
+	}
+}
+
 func TestLoadPrecedence(t *testing.T) {
 	home := t.TempDir()
-	cfgDir := filepath.Join(home, ".config", "afx")
+	cfgDir := filepath.Join(home, "dev.qiankun.afx")
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -22,10 +40,7 @@ root_api_key = "file-root"
 		t.Fatal(err)
 	}
 
-	t.Setenv("HOME", home)
-	// 指向测试目录
-	ConfigPath = func() string { return cfgPath }
-	defer func() { ConfigPath = func() string { return filepath.Join(home, ".config", "afx", "config.toml") } }()
+	useConfigPath(t, cfgPath)
 
 	t.Run("defaults and file", func(t *testing.T) {
 		cfg, err := Load()
@@ -55,9 +70,8 @@ root_api_key = "file-root"
 
 func TestLoadMissingFileUsesDefaults(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	ConfigPath = func() string { return filepath.Join(home, ".config", "afx", "config.toml") }
-	defer func() { ConfigPath = func() string { return "" } }()
+	cfgPath := filepath.Join(home, "dev.qiankun.afx", "config.toml")
+	useConfigPath(t, cfgPath)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatal(err)
@@ -73,8 +87,7 @@ func TestLoadWithSources(t *testing.T) {
 	if err := os.WriteFile(cfgPath, []byte("endpoint = \"http://file.example.com\"\napi_key = \"file-key\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	ConfigPath = func() string { return cfgPath }
-	defer func() { ConfigPath = func() string { return "" } }()
+	useConfigPath(t, cfgPath)
 
 	t.Setenv("AFX_ENDPOINT", "http://env.example.com")
 	t.Setenv("AFX_API_KEY", "")
@@ -89,7 +102,41 @@ func TestLoadWithSources(t *testing.T) {
 	if cfg.APIKey != "file-key" || sources.APIKey != "config_file" {
 		t.Fatalf("api key source = %q", sources.APIKey)
 	}
-	if !sources.ConfigFilePresent || sources.RootAPIKey != "none" {
+	if !sources.ConfigFilePresent || sources.ConfigFile != cfgPath || sources.RootAPIKey != "none" {
 		t.Fatalf("sources = %+v", sources)
+	}
+}
+
+func TestLoadIgnoresOldConfigPath(t *testing.T) {
+	dir := t.TempDir()
+	currentPath := filepath.Join(dir, "dev.qiankun.afx", "config.toml")
+	oldPath := filepath.Join(dir, "afx", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(oldPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(oldPath, []byte("endpoint = \"http://old.example.com\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	useConfigPath(t, currentPath)
+
+	cfg, sources, err := LoadWithSources()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Endpoint != DefaultEndpoint || sources.ConfigFilePresent || sources.ConfigFile != currentPath {
+		t.Fatalf("cfg = %+v, sources = %+v", cfg, sources)
+	}
+}
+
+func TestLoadReportsInvalidConfigPath(t *testing.T) {
+	dir := t.TempDir()
+	currentPath := filepath.Join(dir, "dev.qiankun.afx")
+	if err := os.MkdirAll(currentPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	useConfigPath(t, currentPath)
+
+	if _, _, err := LoadWithSources(); err == nil {
+		t.Fatal("expected current config path error")
 	}
 }

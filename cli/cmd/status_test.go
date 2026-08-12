@@ -35,6 +35,13 @@ func TestCollectStatusWithoutAPIKey(t *testing.T) {
 	if data["state"] != "unconfigured" {
 		t.Fatalf("data = %#v", data)
 	}
+	cfg := data["config"].(map[string]any)
+	if cfg["config_file"] == "" {
+		t.Fatalf("config = %#v", cfg)
+	}
+	if _, exists := cfg["config_file_legacy"]; exists {
+		t.Fatal("status config must not contain legacy fields")
+	}
 }
 
 func TestCollectStatusValidatesKeyWithoutExposingIt(t *testing.T) {
@@ -66,5 +73,19 @@ func TestCollectStatusValidatesKeyWithoutExposingIt(t *testing.T) {
 	cfg := data["config"].(map[string]any)
 	if _, exists := cfg["api_key"]; exists {
 		t.Fatal("status config must not contain API key")
+	}
+}
+
+func TestStatusTextReportsConfigCreationPath(t *testing.T) {
+	text := statusText(map[string]any{
+		"state": "unconfigured",
+		"config": map[string]any{
+			"endpoint":        "https://files.example.com",
+			"endpoint_source": "environment",
+			"config_file":     "/platform/dev.qiankun.afx/config.toml",
+		},
+	})
+	if !strings.Contains(text, "/platform/dev.qiankun.afx/config.toml") {
+		t.Fatalf("text = %q", text)
 	}
 }

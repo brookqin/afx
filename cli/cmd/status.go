@@ -13,8 +13,6 @@ import (
 	"afx/internal/output"
 )
 
-const displayConfigPath = "~/.config/afx/config.toml"
-
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Check configuration, service connectivity, and API key validity",
@@ -50,7 +48,7 @@ func collectStatus(ctx context.Context) (map[string]any, error) {
 		"config": map[string]any{
 			"endpoint":            cfg.Endpoint,
 			"endpoint_source":     sources.Endpoint,
-			"config_file":         displayConfigPath,
+			"config_file":         sources.ConfigFile,
 			"config_file_present": sources.ConfigFilePresent,
 			"api_key_configured":  cfg.APIKey != "",
 			"api_key_source":      sources.APIKey,
@@ -85,5 +83,5 @@ func statusText(value any) string {
 	if data["state"] == "ready" {
 		return fmt.Sprintf("Ready\nEndpoint: %v (%v)\nAPI key: valid (%v)", cfg["endpoint"], cfg["endpoint_source"], cfg["api_key_source"])
 	}
-	return fmt.Sprintf("Service reachable, but no API key is configured\nEndpoint: %v (%v)\nConfigure AFX_API_KEY or %s", cfg["endpoint"], cfg["endpoint_source"], displayConfigPath)
+	return fmt.Sprintf("Service reachable, but no API key is configured\nEndpoint: %v (%v)\nCreate %v or set AFX_API_KEY", cfg["endpoint"], cfg["endpoint_source"], cfg["config_file"])
 }

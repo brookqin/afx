@@ -1,8 +1,9 @@
 // Package config 处理 CLI 配置优先级(§30.1):
-// 命令行参数 > 环境变量 > 配置文件(~/.config/afx/config.toml)
+// 命令行参数 > 环境变量 > 用户配置目录中的 dev.qiankun.afx/config.toml。
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -20,28 +21,41 @@ type Config struct {
 // Sources records where non-secret configuration values were resolved from.
 type Sources struct {
 	ConfigFilePresent bool
+	ConfigFile        string
 	Endpoint          string
 	APIKey            string
 	RootAPIKey        string
 }
 
-// ConfigPath 返回配置文件路径(变量便于测试覆盖)。
+var userConfigDir = os.UserConfigDir
+
+// ConfigPath 返回当前平台的规范配置文件路径(变量便于测试覆盖)。
 var ConfigPath = func() string {
-	home, err := os.UserHomeDir()
+	dir, err := userConfigDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".config", "afx", "config.toml")
+	return filepath.Join(dir, "dev.qiankun.afx", "config.toml")
 }
 
 // LoadWithSources 从配置文件 + 环境变量加载配置并记录来源。
 func LoadWithSources() (*Config, Sources, error) {
 	cfg := &Config{Endpoint: DefaultEndpoint}
-	sources := Sources{Endpoint: "default", APIKey: "none", RootAPIKey: "none"}
+	sources := Sources{
+		ConfigFile: ConfigPath(),
+		Endpoint:   "default",
+		APIKey:     "none",
+		RootAPIKey: "none",
+	}
 
 	// 1. 配置文件
-	if path := ConfigPath(); path != "" {
-		if data, err := os.ReadFile(path); err == nil {
+	if sources.ConfigFile != "" {
+		data, err := os.ReadFile(sources.ConfigFile)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return nil, Sources{}, fmt.Errorf("read config %q: %w", sources.ConfigFile, err)
+			}
+		} else {
 			sources.ConfigFilePresent = true
 			fileCfg := &Config{}
 			if err := toml.Unmarshal(data, fileCfg); err != nil {

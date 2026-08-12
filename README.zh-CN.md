@@ -184,6 +184,8 @@ export AFX_API_KEY=afx_...
 
 `afx status --json` 不显示任何密钥，只报告解析后的 Endpoint 与配置来源。未配置普通 Key 时检查服务连通性；配置 Key 后通过不依赖业务 Scope 的认证状态接口校验 Key 是否有效。
 
+CLI 不会自动生成或迁移持久配置。用户需要在平台用户配置目录下手工创建 `dev.qiankun.afx/config.toml`：macOS 使用 `$HOME/Library/Application Support`，Linux 使用 `$XDG_CONFIG_HOME`（未设置时为 `$HOME/.config`），Windows 使用 `%AppData%`。`afx status --json` 的 `data.config.config_file` 会报告精确路径。这是 breaking 路径变更，旧的 `afx/config.toml` 与 `~/.config/afx/config.toml` 均不再读取。
+
 推送 `v1.2.3` 这类语义化版本 Tag 后，CLI Release workflow 会自动测试并发布 Linux、macOS、Windows 的 amd64/arm64 压缩包及 `checksums.txt`。
 
 ### 3. 本地开发与测试

@@ -26,7 +26,8 @@ var rootCmd = &cobra.Command{
 
 Upload and share files, create one-time inbox links, wait for received files,
 and perform Root administration.
-Configuration precedence: flags > environment variables > ~/.config/afx/config.toml.`,
+Configuration precedence: flags > environment variables >
+dev.qiankun.afx/config.toml in the platform user configuration directory.`,
 	SilenceUsage:      true,
 	SilenceErrors:     true,
 	CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
