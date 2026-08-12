@@ -65,6 +65,21 @@ npx wrangler deploy
 `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` 是仅授予该 Bucket Object Read & Write 的 R2 S3
 凭据，只作为 Worker Secret 保存。浏览器和 CLI 只能拿到短期 presigned URL。
 
+### CLI 持久配置
+
+使用 CLI 创建或更新配置，不要手工拼接包含 Key 的命令参数：
+
+```bash
+set -o pipefail
+printf '%s' "$AFX_API_KEY" | \
+  afx config set --endpoint https://files.example.com --api-key-stdin --json
+unset AFX_API_KEY
+afx status --json
+```
+
+配置写入 `os.UserConfigDir()/dev.qiankun.afx/config.toml`。`--api-key-stdin` 也可以直接接收
+`afx admin keys create --json` 的完整成功输出，且任何输出都不包含 API Key。CLI 不读取或迁移旧配置路径。
+
 ## Cron 清理
 
 Worker 配置了每小时 Cron Trigger(`0 * * * *`),执行:

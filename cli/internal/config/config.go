@@ -13,9 +13,9 @@ import (
 const DefaultEndpoint = "http://localhost:8787"
 
 type Config struct {
-	Endpoint   string `toml:"endpoint"`
-	APIKey     string `toml:"api_key"`
-	RootAPIKey string `toml:"root_api_key"`
+	Endpoint   string `toml:"endpoint,omitempty"`
+	APIKey     string `toml:"api_key,omitempty"`
+	RootAPIKey string `toml:"root_api_key,omitempty"`
 }
 
 // Sources records where non-secret configuration values were resolved from.
@@ -50,17 +50,12 @@ func LoadWithSources() (*Config, Sources, error) {
 
 	// 1. 配置文件
 	if sources.ConfigFile != "" {
-		data, err := os.ReadFile(sources.ConfigFile)
+		fileCfg, present, err := loadFile(sources.ConfigFile)
 		if err != nil {
-			if !os.IsNotExist(err) {
-				return nil, Sources{}, fmt.Errorf("read config %q: %w", sources.ConfigFile, err)
-			}
-		} else {
+			return nil, Sources{}, err
+		}
+		if present {
 			sources.ConfigFilePresent = true
-			fileCfg := &Config{}
-			if err := toml.Unmarshal(data, fileCfg); err != nil {
-				return nil, Sources{}, err
-			}
 			if fileCfg.Endpoint != "" {
 				cfg.Endpoint = fileCfg.Endpoint
 				sources.Endpoint = "config_file"
@@ -90,6 +85,88 @@ func LoadWithSources() (*Config, Sources, error) {
 		sources.RootAPIKey = "environment"
 	}
 	return cfg, sources, nil
+}
+
+// LoadPersistent reads only the persistent file, without environment overrides.
+func LoadPersistent() (*Config, bool, error) {
+	path := ConfigPath()
+	if path == "" {
+		return nil, false, fmt.Errorf("user configuration directory is unavailable")
+	}
+	return loadFile(path)
+}
+
+// SavePersistent atomically creates or replaces the persistent configuration.
+func SavePersistent(cfg *Config) (string, bool, error) {
+	path := ConfigPath()
+	if path == "" {
+		return "", false, fmt.Errorf("user configuration directory is unavailable")
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", false, fmt.Errorf("create config directory %q: %w", dir, err)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		return "", false, fmt.Errorf("secure config directory %q: %w", dir, err)
+	}
+
+	created := true
+	if info, err := os.Lstat(path); err == nil {
+		created = false
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return "", false, fmt.Errorf("config path %q is not a regular file", path)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", false, fmt.Errorf("inspect config %q: %w", path, err)
+	}
+
+	raw, err := toml.Marshal(cfg)
+	if err != nil {
+		return "", false, fmt.Errorf("encode config: %w", err)
+	}
+	tmp, err := os.CreateTemp(dir, ".config-*.tmp")
+	if err != nil {
+		return "", false, fmt.Errorf("create temporary config: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return "", false, fmt.Errorf("secure temporary config: %w", err)
+	}
+	if _, err := tmp.Write(raw); err != nil {
+		tmp.Close()
+		return "", false, fmt.Errorf("write temporary config: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return "", false, fmt.Errorf("sync temporary config: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return "", false, fmt.Errorf("close temporary config: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return "", false, fmt.Errorf("replace config %q: %w", path, err)
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		return "", false, fmt.Errorf("secure config %q: %w", path, err)
+	}
+	return path, created, nil
+}
+
+func loadFile(path string) (*Config, bool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &Config{}, false, nil
+		}
+		return nil, false, fmt.Errorf("read config %q: %w", path, err)
+	}
+	cfg := &Config{}
+	if err := toml.Unmarshal(data, cfg); err != nil {
+		return nil, false, fmt.Errorf("parse config %q: %w", path, err)
+	}
+	return cfg, true, nil
 }
 
 // Load preserves the original configuration-only API.

@@ -173,6 +173,10 @@ make build
 export AFX_ENDPOINT=https://files.example.com
 export AFX_API_KEY=afx_...
 
+printf '%s' "$AFX_API_KEY" | \
+  ./cli/afx config set --endpoint "$AFX_ENDPOINT" --api-key-stdin --json
+unset AFX_API_KEY
+
 ./cli/afx status --json
 
 ./cli/afx upload report.pdf --description "Quarterly report" --expires 24h --json
@@ -182,9 +186,13 @@ export AFX_API_KEY=afx_...
 
 Run `./cli/afx --help` for the full English command reference.
 
+`afx config set` creates or updates the persistent configuration. `--api-key-stdin` accepts either a raw tenant API key or the complete JSON output of `afx admin keys create --json`; it never returns the key. Omitted fields retain their current values, so `afx config set --endpoint https://new.example.com --json` updates only the endpoint. Root keys are rejected. On macOS and Linux the command enforces `0700` on the directory and `0600` on the file.
+
+When piping `afx admin keys create --json` into `config set` on POSIX shells, enable `pipefail`. If key creation succeeds but configuration fails, revoke the unused tenant key before retrying.
+
 `afx status --json` reports the resolved endpoint and configuration sources without exposing keys. It verifies service connectivity when no tenant key is configured and validates the key through the scope-independent authenticated status endpoint when one is present.
 
-The CLI does not generate or migrate its persistent configuration. Create `dev.qiankun.afx/config.toml` manually under the platform user configuration directory: `$HOME/Library/Application Support` on macOS, `$XDG_CONFIG_HOME` (or `$HOME/.config`) on Linux, and `%AppData%` on Windows. `data.config.config_file` from `afx status --json` reports the exact path. This is a breaking path: earlier `afx/config.toml` and `~/.config/afx/config.toml` locations are not read.
+The CLI stores persistent configuration at `dev.qiankun.afx/config.toml` under the platform user configuration directory: `$HOME/Library/Application Support` on macOS, `$XDG_CONFIG_HOME` (or `$HOME/.config`) on Linux, and `%AppData%` on Windows. `data.config.config_file` from `afx status --json` reports the exact path. This is a breaking path: earlier `afx/config.toml` and `~/.config/afx/config.toml` locations are not read or migrated.
 
 Pushing a semantic version tag such as `v1.2.3` runs the CLI release workflow. It tests and publishes Linux, macOS, and Windows archives for amd64 and arm64 together with `checksums.txt`.
 

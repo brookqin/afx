@@ -13,7 +13,7 @@ describe('公共首页', () => {
     expect(html).toContain('<html lang="zh-CN">');
     expect(html).toContain('临时文件交换');
     expect(html).toContain('class="home-grid"');
-    expect(html).toContain('Agent File Exchange v0.2.0');
+    expect(html).toContain('Agent File Exchange v0.3.0');
     expect(html).toContain('https://github.com/brookqin/afx');
 
     const english = await SELF.fetch('http://localhost/?lang=en');

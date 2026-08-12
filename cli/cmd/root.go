@@ -54,6 +54,7 @@ func init() {
 	rootCmd.AddCommand(filesCmd)
 	rootCmd.AddCommand(inboxCmd)
 	rootCmd.AddCommand(adminCmd)
+	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(statusCmd)
 }

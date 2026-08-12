@@ -173,6 +173,10 @@ make build
 export AFX_ENDPOINT=https://files.example.com
 export AFX_API_KEY=afx_...
 
+printf '%s' "$AFX_API_KEY" | \
+  ./cli/afx config set --endpoint "$AFX_ENDPOINT" --api-key-stdin --json
+unset AFX_API_KEY
+
 ./cli/afx status --json
 
 ./cli/afx upload report.pdf --description "季度报告" --expires 24h --json
@@ -182,9 +186,13 @@ export AFX_API_KEY=afx_...
 
 运行 `./cli/afx --help` 查看完整英文命令说明。
 
+`afx config set` 用于创建或更新持久配置。`--api-key-stdin` 既接受普通 API Key 明文，也接受 `afx admin keys create --json` 的完整 JSON 输出；结果不会返回 Key。未提供的字段保持原值，因此 `afx config set --endpoint https://new.example.com --json` 只更新 Endpoint。Root Key 会被拒绝。macOS 与 Linux 上，命令强制目录权限为 `0700`、文件权限为 `0600`。
+
+在 POSIX Shell 中把 `afx admin keys create --json` 管道传给 `config set` 时应启用 `pipefail`。如果 Key 已创建但配置写入失败，应先吊销未使用的租户 Key，再重试。
+
 `afx status --json` 不显示任何密钥，只报告解析后的 Endpoint 与配置来源。未配置普通 Key 时检查服务连通性；配置 Key 后通过不依赖业务 Scope 的认证状态接口校验 Key 是否有效。
 
-CLI 不会自动生成或迁移持久配置。用户需要在平台用户配置目录下手工创建 `dev.qiankun.afx/config.toml`：macOS 使用 `$HOME/Library/Application Support`，Linux 使用 `$XDG_CONFIG_HOME`（未设置时为 `$HOME/.config`），Windows 使用 `%AppData%`。`afx status --json` 的 `data.config.config_file` 会报告精确路径。这是 breaking 路径变更，旧的 `afx/config.toml` 与 `~/.config/afx/config.toml` 均不再读取。
+CLI 将持久配置写入平台用户配置目录下的 `dev.qiankun.afx/config.toml`：macOS 使用 `$HOME/Library/Application Support`，Linux 使用 `$XDG_CONFIG_HOME`（未设置时为 `$HOME/.config`），Windows 使用 `%AppData%`。`afx status --json` 的 `data.config.config_file` 会报告精确路径。这是 breaking 路径变更，旧的 `afx/config.toml` 与 `~/.config/afx/config.toml` 均不再读取或迁移。
 
 推送 `v1.2.3` 这类语义化版本 Tag 后，CLI Release workflow 会自动测试并发布 Linux、macOS、Windows 的 amd64/arm64 压缩包及 `checksums.txt`。
 

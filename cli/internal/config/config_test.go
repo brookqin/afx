@@ -4,6 +4,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -138,5 +139,81 @@ func TestLoadReportsInvalidConfigPath(t *testing.T) {
 
 	if _, _, err := LoadWithSources(); err == nil {
 		t.Fatal("expected current config path error")
+	}
+}
+
+func TestSavePersistentCreatesAndUpdatesSecureFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dev.qiankun.afx", "config.toml")
+	useConfigPath(t, path)
+
+	gotPath, created, err := SavePersistent(&Config{Endpoint: "https://one.example.com", APIKey: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != path || !created {
+		t.Fatalf("path = %q, created = %v", gotPath, created)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("file mode = %o", info.Mode().Perm())
+	}
+	dirInfo, err := os.Stat(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dirInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("directory mode = %o", dirInfo.Mode().Perm())
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "root_api_key") {
+		t.Fatal("empty Root key was serialized")
+	}
+
+	_, created, err = SavePersistent(&Config{Endpoint: "https://two.example.com", APIKey: "second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created {
+		t.Fatal("update reported creation")
+	}
+	cfg, exists, err := LoadPersistent()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists || cfg.Endpoint != "https://two.example.com" || cfg.APIKey != "second" {
+		t.Fatalf("cfg = %+v, exists = %v", cfg, exists)
+	}
+}
+
+func TestSavePersistentRejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.toml")
+	if err := os.WriteFile(target, []byte("endpoint = \"https://safe.example.com\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "dev.qiankun.afx", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	useConfigPath(t, path)
+
+	if _, _, err := SavePersistent(&Config{Endpoint: "https://evil.example.com"}); err == nil {
+		t.Fatal("expected symlink rejection")
+	}
+	raw, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "evil") {
+		t.Fatal("symlink target was modified")
 	}
 }

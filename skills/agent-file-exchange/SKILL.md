@@ -20,11 +20,12 @@ if [ -z "$AFX_BIN" ]; then
 fi
 "$AFX_BIN" version --json
 "$AFX_BIN" status --json
+"$AFX_BIN" config set --help >/dev/null
 ```
 
 The installer downloads only from `brookqin/afx` GitHub Releases, verifies the published SHA-256 checksum, and never invokes `sudo`. On Windows, download the matching archive and `checksums.txt` from the same release, verify the checksum, and use `afx.exe`.
 
-If `status` is an unknown command, the CLI is outdated. Run the bundled installer once to upgrade, then retry. Do not continue with an incompatible CLI.
+If `status` or `config set` is an unknown command, the CLI is outdated. Run the bundled installer once to upgrade, then retry both checks. If the latest published CLI still lacks either command, stop and report that a compatible release is unavailable; never fall back to writing TOML directly.
 
 Interpret `status --json` as follows:
 
@@ -44,7 +45,7 @@ If no tenant API key is configured, ask the user to choose one of these paths be
 Request only:
 
 1. The HTTPS AFX endpoint, such as `https://files.example.com`.
-2. A tenant API key beginning with `afx_`; do not request a Root key.
+2. A tenant API key beginning with `afx_`; do not request a Root key or ask the user to paste any key into chat.
 3. Whether configuration should be ephemeral environment variables or the persistent local config file.
 
 For an ephemeral session:
@@ -54,24 +55,25 @@ export AFX_ENDPOINT="https://files.example.com"
 export AFX_API_KEY="afx_replace_with_tenant_key"
 ```
 
-For persistent local configuration, create `dev.qiankun.afx/config.toml` under the platform user configuration directory returned by `os.UserConfigDir`:
+For persistent local configuration, use the CLI; never write the TOML directly:
 
-- macOS: `$HOME/Library/Application Support/dev.qiankun.afx/config.toml`
-- Linux: `$XDG_CONFIG_HOME/dev.qiankun.afx/config.toml`, or `$HOME/.config/dev.qiankun.afx/config.toml` when `XDG_CONFIG_HOME` is unset
-- Windows: `%AppData%\dev.qiankun.afx\config.toml`
-
-The CLI does not generate or migrate this file. Create it only after the user authorizes persistent configuration, using:
-
-```toml
-endpoint = "https://files.example.com"
-api_key = "afx_replace_with_tenant_key"
+```sh
+printf '%s' "$AFX_API_KEY" | \
+  "$AFX_BIN" config set --endpoint "$AFX_ENDPOINT" --api-key-stdin --json
+unset AFX_API_KEY
 ```
 
-On macOS and Linux, set the directory to mode `0700` and the file to mode `0600`. On Windows, restrict the directory and file ACLs to the current user. Never commit or upload it. Resolution order is command flags, environment variables, config file, then the default endpoint `http://localhost:8787`; an API key has no default. Avoid `--api-key` and `--root-key` because command arguments can enter history or process listings.
+Run this only when the key is already available in an authorized local environment; otherwise ask the user to run the equivalent command with a private local prompt. Never put a key literal in a command or tool call. `--api-key-stdin` accepts a raw tenant key or the complete JSON envelope from `admin keys create --json`, rejects Root keys, writes atomically, and never returns the key. Omitted fields retain their stored values. Require `ok: true`, then rerun `status --json` and require `data.state: "ready"`.
 
-`status --json` reports the exact path at `data.config.config_file`. This is a breaking path change: never read or migrate earlier `afx/config.toml` or `~/.config/afx/config.toml` locations automatically.
+The CLI stores `dev.qiankun.afx/config.toml` under `os.UserConfigDir`; `status --json` reports the exact path at `data.config.config_file`. Never read or migrate earlier paths automatically. Resolution order remains flags, environment variables, persistent config, then the default endpoint `http://localhost:8787`.
 
-Run `status --json` again and require `data.state: "ready"`.
+To update only the endpoint later:
+
+```sh
+"$AFX_BIN" config set --endpoint "https://new.example.com" --json
+```
+
+Require `ok: true`; the existing API key must remain configured.
 
 ### Use a self-hosted deployment
 
@@ -131,12 +133,14 @@ try {
 To create a tenant key for the complete workflow:
 
 ```sh
-afx admin keys create codex-skill \
+set -o pipefail
+AFX_ROOT_API_KEY="$ROOT_KEY" "$AFX_BIN" admin keys create codex-skill \
   --scopes files:upload,files:list,files:read,files:delete,inboxes:create,inboxes:list,inboxes:read,inboxes:delete \
-  --json
+  --json | "$AFX_BIN" config set --endpoint "$AFX_ENDPOINT" --api-key-stdin --json
+unset ROOT_KEY
 ```
 
-The full tenant key is returned once. Store it as `AFX_API_KEY` or `api_key`, then rerun `status --json`.
+Require the final `config set` envelope to have `ok: true`, then rerun `status --json`. This pipeline keeps the one-time tenant key out of logs and command arguments. If configuration fails after key creation, report that a tenant key may have been created and use an explicitly authorized Root operation to find and revoke the unused key before retrying.
 
 ## 3. Upload and share a download link
 
